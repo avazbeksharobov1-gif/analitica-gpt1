@@ -20,9 +20,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 console.log('BOT TOKEN:', BOT_TOKEN ? 'OK' : 'MISSING');
 
-if (!BOT_TOKEN) {
-  console.error('❌ TELEGRAM_BOT_TOKEN is missing');
-} else {
+if (BOT_TOKEN) {
   const bot = new Telegraf(BOT_TOKEN);
 
   bot.start((ctx) =>
@@ -50,6 +48,8 @@ if (!BOT_TOKEN) {
   bot.launch()
     .then(() => console.log('🤖 Telegram bot started'))
     .catch(err => console.error('❌ Bot error:', err));
+} else {
+  console.error('❌ TELEGRAM_BOT_TOKEN is missing');
 }
 
 /* ---------- SERVER ---------- */
@@ -57,6 +57,7 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log('🚀 Server running on port', PORT);
 });
+
 
 
 
