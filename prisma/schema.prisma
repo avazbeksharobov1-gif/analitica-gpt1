@@ -1,23 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
 model User {
-  id   Int    @id @default(autoincrement())
-  tgId String @unique
-  plan String
+  id        String   @id @default(cuid())
+  telegramId String  @unique
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
 }
 
-model Stats {
-  id      Int @id @default(autoincrement())
-  revenue Int
-  orders  Int
-  ads     Int
-  date    DateTime @default(now())
+model Subscription {
+  id        String   @id @default(cuid())
+  userId    String
+  plan      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
 }
 
+enum Role {
+  USER
+  ADMIN
+}
