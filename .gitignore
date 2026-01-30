@@ -1,7 +1,4 @@
 node_modules
 .env
-git rm -r --cached node_modules
-git add .gitignore
-git commit -m "chore: remove node_modules and ignore env"
-git push
+prisma/dev.db
 
