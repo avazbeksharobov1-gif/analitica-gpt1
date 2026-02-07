@@ -1,5 +1,3 @@
-const path = require('path');
-const os = require('os');
 const ExcelJS = require('exceljs');
 
 function fmtDate(d) {
@@ -7,7 +5,7 @@ function fmtDate(d) {
   return new Date(d).toISOString().slice(0, 10);
 }
 
-async function exportExcel({ kpi, items, range, projectName }) {
+async function writeExcel(res, { kpi, items, range, projectName }) {
   const wb = new ExcelJS.Workbook();
 
   const summary = wb.addWorksheet('Summary');
@@ -61,9 +59,7 @@ async function exportExcel({ kpi, items, range, projectName }) {
     });
   });
 
-  const file = path.join(os.tmpdir(), `analitica-report-${Date.now()}.xlsx`);
-  await wb.xlsx.writeFile(file);
-  return file;
+  await wb.xlsx.write(res);
 }
 
-module.exports = { exportExcel };
+module.exports = { writeExcel };

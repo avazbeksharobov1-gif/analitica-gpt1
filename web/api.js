@@ -7,8 +7,8 @@ const {
 const { aiInsight, aiRecommend, aiAnomalyDetect, aiProductProfit } = require('../services/ai');
 const { syncDay } = require('../services/ingest');
 const { prisma } = require('../services/db');
-const { exportExcel } = require('../exporter');
-const { generatePDF } = require('../services/report');
+const { writeExcel } = require('../exporter');
+const { generatePDFStream } = require('../services/report');
 
 module.exports = (app) => {
   const AI_DISABLED = process.env.DISABLE_AI === 'true';
@@ -47,17 +47,20 @@ module.exports = (app) => {
         prisma.project.findUnique({ where: { id: projectId } })
       ]);
 
-      const file = await exportExcel({
+      const name = `analitica-${projectId}-${from.toISOString().slice(0, 10)}-${to
+        .toISOString()
+        .slice(0, 10)}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+
+      await writeExcel(res, {
         kpi,
         items,
         range: { from, to },
         projectName: project ? project.name : null
       });
-
-      const name = `analitica-${projectId}-${from.toISOString().slice(0, 10)}-${to
-        .toISOString()
-        .slice(0, 10)}.xlsx`;
-      res.download(file, name);
+      res.end();
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
     }
@@ -71,15 +74,16 @@ module.exports = (app) => {
         prisma.project.findUnique({ where: { id: projectId } })
       ]);
 
-      const file = await generatePDF(kpi, {
-        range: { from, to },
-        projectName: project ? project.name : null
-      });
-
       const name = `analitica-${projectId}-${from.toISOString().slice(0, 10)}-${to
         .toISOString()
         .slice(0, 10)}.pdf`;
-      res.download(file, name);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+
+      await generatePDFStream(res, kpi, {
+        range: { from, to },
+        projectName: project ? project.name : null
+      });
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
     }

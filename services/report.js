@@ -1,18 +1,13 @@
 const PDFDocument = require('pdfkit');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
 
 function fmtDate(d) {
   if (!d) return '';
   return new Date(d).toISOString().slice(0, 10);
 }
 
-async function generatePDF(stats, opts = {}) {
-  const file = path.join(os.tmpdir(), `analitica-report-${Date.now()}.pdf`);
+async function generatePDFStream(res, stats, opts = {}) {
   const doc = new PDFDocument({ margin: 40 });
-
-  doc.pipe(fs.createWriteStream(file));
+  doc.pipe(res);
   doc.fontSize(18).text('Analitica Report', { underline: true });
   doc.moveDown();
 
@@ -33,8 +28,6 @@ async function generatePDF(stats, opts = {}) {
     .text(`COGS: ${stats.cogs}`)
     .text(`Profit: ${stats.profit}`);
   doc.end();
-
-  return file;
 }
 
-module.exports = { generatePDF };
+module.exports = { generatePDFStream };
