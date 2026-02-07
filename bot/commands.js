@@ -1,13 +1,16 @@
-﻿const {
+const {
   getKpi,
   getCompareStats,
   getForecastCompare,
   listProjects,
-  addExpense
+  addExpense,
+  getDailySeries
 } = require('../services/analytics');
 const { aiInsight, aiRecommend } = require('../services/ai');
 const { syncDay } = require('../services/ingest');
 const { prisma } = require('../services/db');
+const { generatePDFBuffer } = require('../services/report');
+const QuickChart = require('quickchart-js');
 
 const AI_DISABLED = process.env.DISABLE_AI === 'true';
 
@@ -54,6 +57,7 @@ function setupCommands(bot) {
         '/month - 30 day KPI\n' +
         '/compare - Week compare\n' +
         '/forecast - 30 day forecast\n' +
+        '/report [days] - PDF report (default 7)\n' +
         '/insight - AI insight\n' +
         '/recommend - AI recommendations\n' +
         '/sync [YYYY-MM-DD] - Sync seller data\n' +
@@ -138,6 +142,64 @@ function setupCommands(bot) {
         `Today: ${today}\n` +
         `After 30 days: ${day30}`
     );
+  });
+
+  bot.command('report', async (ctx) => {
+    try {
+      const projectId = getProjectId(ctx);
+      const parts = ctx.message.text.trim().split(/\s+/);
+      let days = parts[1] ? Number(parts[1]) : 7;
+      if (Number.isNaN(days) || days < 1) days = 7;
+      if (days > 90) days = 90;
+
+      const to = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - (days - 1));
+
+      const [stats, project, series] = await Promise.all([
+        getKpi(projectId, from, to),
+        prisma.project.findUnique({ where: { id: projectId } }),
+        getDailySeries(projectId, from, to)
+      ]);
+
+      let chartImage = null;
+      try {
+        const labels = series.map(r => r.date);
+        const revenue = series.map(r => r.revenue || 0);
+        const profit = series.map(r => r.profit || 0);
+
+        const qc = new QuickChart();
+        qc.setConfig({
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Revenue', data: revenue, borderColor: '#2563eb', fill: false },
+              { label: 'Profit', data: profit, borderColor: '#16a34a', fill: false }
+            ]
+          }
+        });
+        qc.setWidth(800);
+        qc.setHeight(400);
+        qc.setBackgroundColor('white');
+        chartImage = await qc.toBinary();
+      } catch (e) {
+        chartImage = null;
+      }
+
+      const buffer = await generatePDFBuffer(stats, {
+        range: { from, to },
+        projectName: project ? project.name : null,
+        chartImage
+      });
+
+      const name = `report-${from.toISOString().slice(0, 10)}-${to
+        .toISOString()
+        .slice(0, 10)}.pdf`;
+      await ctx.replyWithDocument({ source: buffer, filename: name });
+    } catch (e) {
+      ctx.reply('Report failed');
+    }
   });
 
   bot.command('sync', async (ctx) => {

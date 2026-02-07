@@ -303,6 +303,70 @@ async function getDailySeries(projectId, from, to) {
   return result;
 }
 
+async function getSkuSeries(projectId, sku, from, to) {
+  if (!sku) return [];
+  const { start, end } = rangeDates(from, to);
+
+  const [rows, product] = await Promise.all([
+    prisma.sellerItemDaily.findMany({
+      where: { projectId, sku, date: { gte: start, lte: end } },
+      orderBy: { date: 'asc' }
+    }),
+    prisma.product.findUnique({ where: { projectId_sku: { projectId, sku } } })
+  ]);
+
+  const costPrice = product ? product.costPrice : 0;
+  const map = new Map();
+
+  for (const r of rows) {
+    const key = dateKey(r.date);
+    const prev = map.get(key) || {
+      quantity: 0,
+      revenue: 0,
+      fees: 0,
+      acquiring: 0,
+      logistics: 0,
+      returns: 0
+    };
+    prev.quantity += r.quantity || 0;
+    prev.revenue += r.revenue || 0;
+    prev.fees += r.fees || 0;
+    prev.acquiring += r.acquiring || 0;
+    prev.logistics += r.logistics || 0;
+    prev.returns += r.returns || 0;
+    map.set(key, prev);
+  }
+
+  const result = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    const key = dateKey(d);
+    const row = map.get(key) || {
+      quantity: 0,
+      revenue: 0,
+      fees: 0,
+      acquiring: 0,
+      logistics: 0,
+      returns: 0
+    };
+    const cogs = (row.quantity || 0) * costPrice;
+    const profit =
+      row.revenue -
+      row.fees -
+      row.acquiring -
+      row.logistics -
+      row.returns -
+      cogs;
+    result.push({
+      date: key,
+      ...row,
+      cogs,
+      profit
+    });
+  }
+
+  return result;
+}
+
 module.exports = {
   getKpi,
   getCompareStats,
@@ -311,5 +375,6 @@ module.exports = {
   getProject,
   addExpense,
   getProductProfit,
-  getDailySeries
+  getDailySeries,
+  getSkuSeries
 };

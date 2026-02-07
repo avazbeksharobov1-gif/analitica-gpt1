@@ -3,7 +3,8 @@ const {
   getCompareStats,
   getForecastCompare,
   getProductProfit,
-  getDailySeries
+  getDailySeries,
+  getSkuSeries
 } = require('../services/analytics');
 const { aiInsight, aiRecommend, aiAnomalyDetect, aiProductProfit } = require('../services/ai');
 const { syncDay } = require('../services/ingest');
@@ -101,6 +102,18 @@ module.exports = (app) => {
       const from = req.query.from ? new Date(req.query.from) : new Date();
       const to = req.query.to ? new Date(req.query.to) : new Date();
       res.json(await getDailySeries(projectId, from, to));
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.get('/api/series/sku', async (req, res) => {
+    try {
+      const projectId = req.query.project ? Number(req.query.project) : 1;
+      const sku = req.query.sku ? String(req.query.sku) : '';
+      const from = req.query.from ? new Date(req.query.from) : new Date();
+      const to = req.query.to ? new Date(req.query.to) : new Date();
+      res.json(await getSkuSeries(projectId, sku, from, to));
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
     }
@@ -206,6 +219,33 @@ module.exports = (app) => {
       }
     });
     res.json(p);
+  });
+
+  app.post('/api/products/cost', async (req, res) => {
+    try {
+      const projectId = Number(req.body.projectId || 1);
+      const sku = req.body.sku ? String(req.body.sku).trim() : '';
+      if (!sku) return res.status(400).json({ ok: false, error: 'SKU_REQUIRED' });
+      const name = req.body.name ? String(req.body.name) : sku;
+      const costPrice = Number(req.body.costPrice || 0);
+
+      const existing = await prisma.product.findUnique({
+        where: { projectId_sku: { projectId, sku } }
+      });
+
+      const product = existing
+        ? await prisma.product.update({
+            where: { id: existing.id },
+            data: { costPrice, name }
+          })
+        : await prisma.product.create({
+            data: { projectId, sku, name, costPrice }
+          });
+
+      res.json({ ok: true, product });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
   });
 
   app.put('/api/products/:id', async (req, res) => {

@@ -1,5 +1,7 @@
 let chart;
 let dailyChart;
+let skuChart;
+let currentSku = '';
 let currentRange = '7d';
 
 function fmt(n) {
@@ -134,9 +136,9 @@ async function loadProducts(range) {
   const tbody = document.getElementById('productTable');
   const count = document.getElementById('productsCount');
   if (!Array.isArray(items)) {
-    tbody.innerHTML = '<tr><td colspan="11">No data</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12">No data</td></tr>';
     count.innerText = '0 items';
-    return;
+    return [];
   }
 
   count.innerText = `${items.length} items`;
@@ -146,6 +148,11 @@ async function loadProducts(range) {
       <tr>
         <td>${p.sku}</td>
         <td>${p.name}</td>
+        <td>
+          <input class="cost-input" type="number" min="0" step="1"
+                 data-sku="${p.sku}" data-name="${p.name}"
+                 value="${Math.round(p.costPrice || 0)}" />
+        </td>
         <td>${fmt(p.quantity)}</td>
         <td>${fmt(p.revenue)}</td>
         <td>${fmt(p.fees)}</td>
@@ -158,6 +165,17 @@ async function loadProducts(range) {
       </tr>
     `;
   }).join('');
+
+  document.querySelectorAll('.cost-input').forEach((input) => {
+    input.addEventListener('change', async () => {
+      const sku = input.dataset.sku;
+      const name = input.dataset.name;
+      const costPrice = Number(input.value || 0);
+      await saveCost(sku, name, costPrice);
+    });
+  });
+
+  return items;
 }
 
 async function loadAI() {
@@ -187,7 +205,7 @@ async function loadAI() {
 }
 
 async function loadAll() {
-  await Promise.all([
+  const [_, __, ___, ____, products] = await Promise.all([
     loadKpi(currentRange),
     loadCompare(),
     loadForecast(),
@@ -196,6 +214,7 @@ async function loadAll() {
   ]);
   document.getElementById('lastUpdated').innerText = `Updated: ${new Date().toLocaleString()}`;
   updateExportLinks();
+  updateSkuSelect(products || []);
 }
 
 function setupRangeButtons() {
@@ -212,6 +231,70 @@ function setupRangeButtons() {
 function setupActions() {
   document.getElementById('refreshBtn').addEventListener('click', loadAll);
   document.getElementById('aiBtn').addEventListener('click', loadAI);
+}
+
+async function saveCost(sku, name, costPrice) {
+  await fetch('/api/products/cost', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sku, name, costPrice })
+  });
+  loadAll();
+}
+
+function updateSkuSelect(items) {
+  const select = document.getElementById('skuSelect');
+  if (!select) return;
+  if (!items.length) {
+    select.innerHTML = '<option value="">No SKU</option>';
+    return;
+  }
+
+  const previous = currentSku || items[0].sku;
+  select.innerHTML = items.map(p => `<option value="${p.sku}">${p.sku}</option>`).join('');
+  select.value = previous;
+  currentSku = select.value;
+  loadSkuSeries(currentSku, currentRange);
+
+  if (!select.dataset.bound) {
+    select.dataset.bound = '1';
+    select.addEventListener('change', () => {
+      currentSku = select.value;
+      loadSkuSeries(currentSku, currentRange);
+    });
+  }
+}
+
+async function loadSkuSeries(sku, range) {
+  if (!sku) return;
+  const { from, to } = rangeToDates(range);
+  const r = await fetch(`/api/series/sku?sku=${encodeURIComponent(sku)}&from=${from.toISOString()}&to=${to.toISOString()}`);
+  const rows = await r.json();
+  if (!Array.isArray(rows)) return;
+
+  const labels = rows.map(r => r.date);
+  const revenue = rows.map(r => r.revenue || 0);
+  const profit = rows.map(r => r.profit || 0);
+
+  const data = {
+    labels,
+    datasets: [
+      { label: 'Revenue', data: revenue, borderColor: '#0ea5e9', tension: 0.35 },
+      { label: 'Profit', data: profit, borderColor: '#16a34a', tension: 0.35 }
+    ]
+  };
+
+  if (skuChart) {
+    skuChart.data = data;
+    skuChart.update();
+    return;
+  }
+
+  skuChart = new Chart(document.getElementById('skuChart'), {
+    type: 'line',
+    data,
+    options: { plugins: { legend: { position: 'bottom' } } }
+  });
 }
 
 setupRangeButtons();

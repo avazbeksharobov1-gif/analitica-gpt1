@@ -5,9 +5,7 @@ function fmtDate(d) {
   return new Date(d).toISOString().slice(0, 10);
 }
 
-async function generatePDFStream(res, stats, opts = {}) {
-  const doc = new PDFDocument({ margin: 40 });
-  doc.pipe(res);
+function renderReport(doc, stats, opts = {}) {
   doc.fontSize(18).text('Analitica Report', { underline: true });
   doc.moveDown();
 
@@ -27,7 +25,32 @@ async function generatePDFStream(res, stats, opts = {}) {
     .text(`Expenses: ${stats.expenses}`)
     .text(`COGS: ${stats.cogs}`)
     .text(`Profit: ${stats.profit}`);
+
+  if (opts.chartImage) {
+    doc.addPage();
+    doc.fontSize(14).text('Daily revenue & profit', { underline: true });
+    doc.moveDown();
+    doc.image(opts.chartImage, { fit: [520, 280], align: 'center' });
+  }
+}
+
+async function generatePDFStream(res, stats, opts = {}) {
+  const doc = new PDFDocument({ margin: 40 });
+  doc.pipe(res);
+  renderReport(doc, stats, opts);
   doc.end();
 }
 
-module.exports = { generatePDFStream };
+function generatePDFBuffer(stats, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 40 });
+    const chunks = [];
+    doc.on('data', (d) => chunks.push(d));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    renderReport(doc, stats, opts);
+    doc.end();
+  });
+}
+
+module.exports = { generatePDFStream, generatePDFBuffer };
