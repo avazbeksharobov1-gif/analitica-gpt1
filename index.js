@@ -52,6 +52,30 @@ app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 app.get('/', (req, res) => res.redirect('/dashboard'));
 
+// Yandex API notifications (public webhook)
+const YANDEX_NOTIFY_SECRET = process.env.YANDEX_NOTIFY_SECRET;
+app.all('/yandex/notify/:secret?', async (req, res) => {
+  const secret = req.params.secret || req.query.secret || req.headers['x-notify-secret'];
+  if (YANDEX_NOTIFY_SECRET && String(secret) !== String(YANDEX_NOTIFY_SECRET)) {
+    return res.status(401).send('Unauthorized');
+  }
+
+  res.status(200).json({ ok: true });
+
+  try {
+    // basic: notify admins + optional quick sync today
+    const msg = `Yandex notify: ${JSON.stringify(req.body || {})}`.slice(0, 3500);
+    if (!DISABLE_BOT && ADMIN_IDS.length) {
+      for (const chatId of ADMIN_IDS) {
+        // eslint-disable-next-line no-await-in-loop
+        await bot.telegram.sendMessage(chatId, msg);
+      }
+    }
+  } catch (e) {
+    console.error('Yandex notify error:', e.message);
+  }
+});
+
 // WEB
 const addWebRoutes = () => {
   authPages(app);
