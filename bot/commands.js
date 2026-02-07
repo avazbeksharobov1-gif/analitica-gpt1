@@ -9,6 +9,8 @@ const { aiInsight, aiRecommend } = require('../services/ai');
 const { syncDay } = require('../services/ingest');
 const { prisma } = require('../services/db');
 
+const AI_DISABLED = process.env.DISABLE_AI === 'true';
+
 const projectByChat = new Map();
 
 const CATEGORY_ALIASES = {
@@ -154,6 +156,7 @@ function setupCommands(bot) {
   });
 
   bot.command('insight', async (ctx) => {
+    if (AI_DISABLED) return ctx.reply('AI vaqtincha o‘chirildi');
     const projectId = getProjectId(ctx);
     const { thisWeek, lastWeek } = await getCompareStats(projectId);
     const text = await aiInsight(lastWeek.revenue, thisWeek.revenue);
@@ -162,6 +165,7 @@ function setupCommands(bot) {
 
   bot.command('recommend', async (ctx) => {
     try {
+      if (AI_DISABLED) return ctx.reply('AI vaqtincha o‘chirildi');
       const projectId = getProjectId(ctx);
       const today = new Date();
       const text = await aiRecommend(await getKpi(projectId, today, today));

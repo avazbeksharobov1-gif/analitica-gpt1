@@ -9,6 +9,8 @@ const { syncDay } = require('../services/ingest');
 const { prisma } = require('../services/db');
 
 module.exports = (app) => {
+  const AI_DISABLED = process.env.DISABLE_AI === 'true';
+
   function aiFail(res, label, err, debug) {
     const msg = err && err.message ? err.message : String(err || 'Unknown error');
     console.error(`AI ${label} error:`, msg);
@@ -33,6 +35,7 @@ module.exports = (app) => {
 
   app.get('/api/insight', async (req, res) => {
     try {
+      if (AI_DISABLED) return res.send('AI disabled');
       const projectId = req.query.project ? Number(req.query.project) : 1;
       const { thisWeek, lastWeek } = await getCompareStats(projectId);
       const text = await aiInsight(lastWeek.revenue, thisWeek.revenue);
@@ -44,6 +47,7 @@ module.exports = (app) => {
 
   app.get('/api/recommend', async (req, res) => {
     try {
+      if (AI_DISABLED) return res.send('AI disabled');
       const projectId = req.query.project ? Number(req.query.project) : 1;
       const today = new Date();
       const text = await aiRecommend(await getKpi(projectId, today, today));
@@ -55,6 +59,7 @@ module.exports = (app) => {
 
   app.get('/api/anomaly', async (req, res) => {
     try {
+      if (AI_DISABLED) return res.send('AI disabled');
       const projectId = req.query.project ? Number(req.query.project) : 1;
       const days = req.query.days ? Number(req.query.days) : 30;
       const end = new Date();
@@ -76,6 +81,7 @@ module.exports = (app) => {
 
   app.get('/api/products/insight', async (req, res) => {
     try {
+      if (AI_DISABLED) return res.send('AI disabled');
       const projectId = req.query.project ? Number(req.query.project) : 1;
       const from = req.query.from ? new Date(req.query.from) : new Date();
       const to = req.query.to ? new Date(req.query.to) : new Date();
