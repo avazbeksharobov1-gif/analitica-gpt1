@@ -5,6 +5,15 @@ const API_KEY = process.env.YANDEX_SELLER_API_KEY;
 const CAMPAIGN_ID = process.env.YANDEX_SELLER_CAMPAIGN_ID;
 const AUTH_MODE = (process.env.YANDEX_SELLER_AUTH_MODE || 'api-key').toLowerCase();
 
+function getCampaignIds() {
+  if (process.env.YANDEX_SELLER_CAMPAIGN_IDS) {
+    return process.env.YANDEX_SELLER_CAMPAIGN_IDS.split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+  return CAMPAIGN_ID ? [CAMPAIGN_ID] : [];
+}
+
 function headers() {
   const h = {
     'Content-Type': 'application/json',
@@ -21,8 +30,8 @@ function headers() {
 }
 
 async function request(path, options = {}) {
-  if (!API_KEY || !CAMPAIGN_ID) {
-    throw new Error('YANDEX_SELLER_API_KEY or YANDEX_SELLER_CAMPAIGN_ID missing');
+  if (!API_KEY) {
+    throw new Error('YANDEX_SELLER_API_KEY missing');
   }
 
   const url = `${BASE_URL}${path}`;
@@ -34,19 +43,29 @@ async function request(path, options = {}) {
   return r.json();
 }
 
-async function fetchOrdersByDate(dateFrom, dateTo) {
-  return request(`/campaigns/${CAMPAIGN_ID}/orders?fromDate=${dateFrom}&toDate=${dateTo}`);
+async function fetchOrdersByDate(dateFrom, dateTo, campaignId) {
+  if (!campaignId) {
+    throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
+  }
+  return request(`/campaigns/${campaignId}/orders?fromDate=${dateFrom}&toDate=${dateTo}`);
 }
 
-async function fetchReturnsByDate(dateFrom, dateTo) {
-  return request(`/campaigns/${CAMPAIGN_ID}/returns?fromDate=${dateFrom}&toDate=${dateTo}`);
+async function fetchReturnsByDate(dateFrom, dateTo, campaignId) {
+  if (!campaignId) {
+    throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
+  }
+  return request(`/campaigns/${campaignId}/returns?fromDate=${dateFrom}&toDate=${dateTo}`);
 }
 
-async function fetchPayoutsByDate(dateFrom, dateTo) {
-  return request(`/campaigns/${CAMPAIGN_ID}/payouts?fromDate=${dateFrom}&toDate=${dateTo}`);
+async function fetchPayoutsByDate(dateFrom, dateTo, campaignId) {
+  if (!campaignId) {
+    throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
+  }
+  return request(`/campaigns/${campaignId}/payouts?fromDate=${dateFrom}&toDate=${dateTo}`);
 }
 
 module.exports = {
+  getCampaignIds,
   fetchOrdersByDate,
   fetchReturnsByDate,
   fetchPayoutsByDate
