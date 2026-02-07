@@ -278,6 +278,31 @@ module.exports = (app) => {
     res.json(list);
   });
 
+  app.get('/api/expenses/summary', async (req, res) => {
+    try {
+      const projectId = req.query.project ? Number(req.query.project) : 1;
+      const from = req.query.from ? new Date(req.query.from) : new Date();
+      const to = req.query.to ? new Date(req.query.to) : new Date();
+      const list = await prisma.expense.findMany({
+        where: { projectId, date: { gte: from, lte: to } },
+        include: { category: true }
+      });
+
+      const agg = new Map();
+      for (const e of list) {
+        const code = e.category?.code || 'other';
+        const name = e.category?.name || 'Other';
+        const prev = agg.get(code) || { code, name, amount: 0 };
+        prev.amount += e.amount || 0;
+        agg.set(code, prev);
+      }
+
+      res.json(Array.from(agg.values()));
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
   app.get('/api/expenses', async (req, res) => {
     const projectId = req.query.project ? Number(req.query.project) : 1;
     const from = req.query.from ? new Date(req.query.from) : new Date();
@@ -312,6 +337,37 @@ module.exports = (app) => {
       const date = req.body.date ? new Date(req.body.date) : new Date();
       const r = await syncDay(projectId, date);
       res.json({ ok: true, data: r });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.post('/api/sync/range', async (req, res) => {
+    try {
+      const projectId = req.body.projectId ? Number(req.body.projectId) : 1;
+      const from = req.body.from ? new Date(req.body.from) : new Date();
+      const to = req.body.to ? new Date(req.body.to) : new Date();
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+        return res.status(400).json({ ok: false, error: 'INVALID_DATE' });
+      }
+      const start = new Date(from);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(to);
+      end.setHours(0, 0, 0, 0);
+
+      const days = [];
+      for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
+        days.push(new Date(d));
+      }
+
+      const results = [];
+      for (const d of days) {
+        // eslint-disable-next-line no-await-in-loop
+        const r = await syncDay(projectId, d);
+        results.push({ date: d.toISOString().slice(0, 10), ...r });
+      }
+
+      res.json({ ok: true, total: results.length });
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
     }

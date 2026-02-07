@@ -17,6 +17,8 @@ const AI_DISABLED = process.env.DISABLE_AI === 'true';
 const projectByChat = new Map();
 
 const CATEGORY_ALIASES = {
+  marketing: 'marketing',
+  reklama: 'marketing',
   svet: 'svet',
   gaz: 'gaz',
   suv: 'suv',

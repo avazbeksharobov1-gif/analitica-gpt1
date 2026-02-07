@@ -9,9 +9,9 @@ function fmt(n) {
 }
 
 function rangeLabel(range) {
-  if (range === '7d') return '7 кун';
-  if (range === '30d') return '30 кун';
-  if (range === 'today') return 'Бугун';
+  if (range === '7d') return '7 kun';
+  if (range === '30d') return '30 kun';
+  if (range === 'today') return 'Bugun';
   return range;
 }
 
@@ -51,8 +51,8 @@ async function loadKpi(range) {
   document.getElementById('kpi-profit').innerText = fmt(s.profit);
 
   const margin = s.revenue ? (s.profit / s.revenue) * 100 : 0;
-  document.getElementById('kpi-margin').innerText = `Margin: ${margin.toFixed(1)}%`;
-  document.getElementById('kpi-range').innerText = `Давр: ${rangeLabel(range)}`;
+  document.getElementById('kpi-margin').innerText = `Marja: ${margin.toFixed(1)}%`;
+  document.getElementById('kpi-range').innerText = `Davr: ${rangeLabel(range)}`;
 
   document.getElementById('kpi-fees').innerText = fmt(s.fees);
   document.getElementById('kpi-acquiring').innerText = fmt(s.acquiring || 0);
@@ -74,8 +74,8 @@ async function loadCompare() {
   const sign = diff >= 0 ? '+' : '';
   const signP = diffProfit >= 0 ? '+' : '';
   document.getElementById('compareText').innerText =
-    `Даромад (шу ҳафта): ${fmt(curr)}\nДаромад (ўтган ҳафта): ${fmt(prev)}\nЎзгариш: ${sign}${diff.toFixed(1)}%\n\n` +
-    `Фойда (шу ҳафта): ${fmt(currProfit)}\nФойда (ўтган ҳафта): ${fmt(prevProfit)}\nЎзгариш: ${signP}${diffProfit.toFixed(1)}%`;
+    `Daromad (shu hafta): ${fmt(curr)}\nDaromad (otgan hafta): ${fmt(prev)}\nOzgarish: ${sign}${diff.toFixed(1)}%\n\n` +
+    `Foyda (shu hafta): ${fmt(currProfit)}\nFoyda (otgan hafta): ${fmt(prevProfit)}\nOzgarish: ${signP}${diffProfit.toFixed(1)}%`;
 }
 
 async function loadForecast() {
@@ -135,6 +135,29 @@ async function loadDailySeries(range) {
   });
 }
 
+async function loadExpenseSummary(range) {
+  const { from, to } = rangeToDates(range);
+  const r = await fetch(`/api/expenses/summary?from=${from.toISOString()}&to=${to.toISOString()}`);
+  const items = await r.json();
+  const wrap = document.getElementById('expenseSummary');
+  if (!wrap) return;
+  if (!Array.isArray(items) || !items.length) {
+    wrap.innerHTML = '<div><span>Reklama</span><b>0</b></div>';
+    return;
+  }
+  wrap.innerHTML = items
+    .map((i) => `<div><span>${i.name}</span><b>${fmt(i.amount)}</b></div>`)
+    .join('');
+}
+
+async function loadExpenseCategories() {
+  const r = await fetch('/api/expense-categories');
+  const list = await r.json();
+  const select = document.getElementById('expenseCategory');
+  if (!select || !Array.isArray(list)) return;
+  select.innerHTML = list.map(c => `<option value="${c.code}">${c.name}</option>`).join('');
+}
+
 async function loadProducts(range) {
   const { from, to } = rangeToDates(range);
   const [productsRes, metricsRes] = await Promise.all([
@@ -147,8 +170,8 @@ async function loadProducts(range) {
   const tbody = document.getElementById('productTable');
   const count = document.getElementById('productsCount');
   if (!Array.isArray(products) || !Array.isArray(metrics)) {
-    tbody.innerHTML = "<tr><td colspan=\"12\">Маълумот йўқ</td></tr>";
-    count.innerText = '0 та';
+    tbody.innerHTML = '<tr><td colspan="12">Malumot yoq</td></tr>';
+    count.innerText = '0 ta';
     return [];
   }
 
@@ -192,7 +215,7 @@ async function loadProducts(range) {
     }
   }
 
-  count.innerText = `${items.length} та`;
+  count.innerText = `${items.length} ta`;
   tbody.innerHTML = items.map((p) => {
     const margin = p.revenue ? (p.profit / p.revenue) * 100 : 0;
     return `
@@ -231,7 +254,7 @@ async function loadProducts(range) {
 
 async function loadAI() {
   const set = (id, text) => (document.getElementById(id).innerText = text);
-  document.getElementById('aiStatus').innerText = 'Юкланмоқда...';
+  document.getElementById('aiStatus').innerText = 'Yuklanmoqda...';
 
   try {
     const [insight, recommend, anomaly, product] = await Promise.all([
@@ -241,17 +264,17 @@ async function loadAI() {
       fetch('/api/products/insight').then(r => r.text())
     ]);
 
-    set('aiInsight', insight || 'Маълумот йўқ');
-    set('aiRecommend', recommend || 'Маълумот йўқ');
-    set('aiAnomaly', anomaly || 'Маълумот йўқ');
-    set('aiProduct', product || 'Маълумот йўқ');
-    document.getElementById('aiStatus').innerText = 'Тайёр';
+    set('aiInsight', insight || 'Malumot yoq');
+    set('aiRecommend', recommend || 'Malumot yoq');
+    set('aiAnomaly', anomaly || 'Malumot yoq');
+    set('aiProduct', product || 'Malumot yoq');
+    document.getElementById('aiStatus').innerText = 'Tayyor';
   } catch (e) {
-    set('aiInsight', 'AI мавжуд эмас');
-    set('aiRecommend', 'AI мавжуд эмас');
-    set('aiAnomaly', 'AI мавжуд эмас');
-    set('aiProduct', 'AI мавжуд эмас');
-    document.getElementById('aiStatus').innerText = 'Хато';
+    set('aiInsight', 'AI mavjud emas');
+    set('aiRecommend', 'AI mavjud emas');
+    set('aiAnomaly', 'AI mavjud emas');
+    set('aiProduct', 'AI mavjud emas');
+    document.getElementById('aiStatus').innerText = 'Xato';
   }
 }
 
@@ -263,9 +286,10 @@ async function loadAll() {
     loadDailySeries(currentRange),
     loadProducts(currentRange)
   ]);
-  document.getElementById('lastUpdated').innerText = `Янгиланди: ${new Date().toLocaleString()}`;
+  document.getElementById('lastUpdated').innerText = `Yangilandi: ${new Date().toLocaleString()}`;
   updateExportLinks();
   updateSkuSelect(products || []);
+  loadExpenseSummary(currentRange);
 }
 
 function setupRangeButtons() {
@@ -282,11 +306,12 @@ function setupRangeButtons() {
 function setupActions() {
   document.getElementById('refreshBtn').addEventListener('click', loadAll);
   document.getElementById('aiBtn').addEventListener('click', loadAI);
+
   const syncBtn = document.getElementById('syncSkuBtn');
   if (syncBtn) {
     syncBtn.addEventListener('click', async () => {
       syncBtn.disabled = true;
-      syncBtn.innerText = 'Юкланмоқда...';
+      syncBtn.innerText = 'Yuklanmoqda...';
       try {
         await fetch('/api/products/sync', { method: 'POST' });
         await loadAll();
@@ -294,7 +319,43 @@ function setupActions() {
         // ignore
       }
       syncBtn.disabled = false;
-      syncBtn.innerText = 'SKUларни янгилаш';
+      syncBtn.innerText = 'SKUlarni yangilash';
+    });
+  }
+
+  const syncRangeBtn = document.getElementById('syncRangeBtn');
+  if (syncRangeBtn) {
+    syncRangeBtn.addEventListener('click', async () => {
+      syncRangeBtn.disabled = true;
+      syncRangeBtn.innerText = 'Sinxronlash...';
+      const { from, to } = rangeToDates('30d');
+      await fetch('/api/sync/range', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: from.toISOString(), to: to.toISOString() })
+      });
+      await loadAll();
+      syncRangeBtn.disabled = false;
+      syncRangeBtn.innerText = '30 kunlik sync';
+    });
+  }
+
+  const expenseForm = document.getElementById('expenseForm');
+  if (expenseForm) {
+    expenseForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const category = document.getElementById('expenseCategory').value;
+      const amount = Number(document.getElementById('expenseAmount').value || 0);
+      const note = document.getElementById('expenseNote').value || '';
+      if (!amount) return;
+      await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, amount, note })
+      });
+      document.getElementById('expenseAmount').value = '';
+      document.getElementById('expenseNote').value = '';
+      loadAll();
     });
   }
 }
@@ -367,3 +428,4 @@ setupRangeButtons();
 setupActions();
 loadAll();
 loadAI();
+loadExpenseCategories();

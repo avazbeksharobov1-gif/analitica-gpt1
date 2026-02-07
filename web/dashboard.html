@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="uz">
 <head>
   <meta charset="UTF-8" />
@@ -14,22 +14,23 @@
       <div class="brand">
         <span class="logo">A</span>
         <div>
-          <div class="title">Analitica</div>
+          <div class="title">Analitika</div>
           <div class="subtitle">Market analitika + AI</div>
         </div>
       </div>
 
       <div class="range">
-        <button class="btn ghost active" data-range="7d">7 кун</button>
-        <button class="btn ghost" data-range="30d">30 кун</button>
-        <button class="btn ghost" data-range="today">Бугун</button>
+        <button class="btn ghost active" data-range="7d">7 kun</button>
+        <button class="btn ghost" data-range="30d">30 kun</button>
+        <button class="btn ghost" data-range="today">Bugun</button>
       </div>
 
       <div class="actions">
-        <button class="btn" id="refreshBtn">Янгилаш</button>
+        <button class="btn" id="refreshBtn">Yangilash</button>
+        <button class="btn ghost" id="syncRangeBtn">30 kunlik sync</button>
         <a class="btn ghost" id="exportExcel" href="#">Excel</a>
         <a class="btn ghost" id="exportPdf" href="#">PDF</a>
-        <button class="btn primary" id="aiBtn">AI янгилаш</button>
+        <button class="btn primary" id="aiBtn">AI yangilash</button>
       </div>
     </div>
   </header>
@@ -37,68 +38,101 @@
   <main class="wrap">
     <section class="kpi-grid">
       <div class="card">
-        <div class="kpi-label">Даромад</div>
+        <div class="kpi-label">Daromad</div>
         <div class="kpi-value" id="kpi-revenue">0</div>
-        <div class="kpi-sub" id="kpi-range">Давр: 7 кун</div>
+        <div class="kpi-sub" id="kpi-range">Davr: 7 kun</div>
       </div>
       <div class="card">
-        <div class="kpi-label">Буюртмалар</div>
+        <div class="kpi-label">Buyurtmalar</div>
         <div class="kpi-value" id="kpi-orders">0</div>
-        <div class="kpi-sub">Жами буюртма</div>
+        <div class="kpi-sub">Jami buyurtma</div>
       </div>
       <div class="card">
-        <div class="kpi-label">Харажат</div>
+        <div class="kpi-label">Xarajat</div>
         <div class="kpi-value danger" id="kpi-expenses">0</div>
-        <div class="kpi-sub">Комиссия + эквайринг + логистика + қайтариш + харажат + COGS</div>
+        <div class="kpi-sub">Komissiya + ekvayring + logistika + qaytarish + xarajat + COGS</div>
       </div>
       <div class="card">
-        <div class="kpi-label">Фойда</div>
+        <div class="kpi-label">Foyda</div>
         <div class="kpi-value success" id="kpi-profit">0</div>
-        <div class="kpi-sub" id="kpi-margin">Маржа: 0%</div>
+        <div class="kpi-sub" id="kpi-margin">Marja: 0%</div>
       </div>
     </section>
 
     <section class="grid-2">
       <div class="panel">
         <div class="panel-header">
-          <h3>Кунлик даромад ва фойда</h3>
+          <h3>Kunlik daromad va foyda</h3>
         </div>
         <canvas id="dailyChart" height="120"></canvas>
       </div>
       <div class="panel">
         <div class="panel-header">
-          <h3>30 кунлик прогноз</h3>
-          <span class="muted" id="lastUpdated">Янгиланди: -</span>
+          <h3>30 kunlik prognoz</h3>
+          <span class="muted" id="lastUpdated">Yangilandi: -</span>
         </div>
         <canvas id="forecastChart" height="120"></canvas>
       </div>
       <div class="panel">
         <div class="panel-header">
-          <h3>Харажатлар тақсимоти</h3>
+          <h3>Xarajatlar taqsimoti</h3>
         </div>
         <div class="breakdown">
-          <div><span>Комиссия</span><b id="kpi-fees">0</b></div>
-          <div><span>Эквайринг</span><b id="kpi-acquiring">0</b></div>
-          <div><span>Логистика</span><b id="kpi-logistics">0</b></div>
-          <div><span>Қайтариш</span><b id="kpi-returns">0</b></div>
-          <div><span>Харажат</span><b id="kpi-expenses-break">0</b></div>
+          <div><span>Komissiya</span><b id="kpi-fees">0</b></div>
+          <div><span>Ekvayring</span><b id="kpi-acquiring">0</b></div>
+          <div><span>Logistika</span><b id="kpi-logistics">0</b></div>
+          <div><span>Qaytarish</span><b id="kpi-returns">0</b></div>
+          <div><span>Xarajat</span><b id="kpi-expenses-break">0</b></div>
           <div><span>COGS</span><b id="kpi-cogs">0</b></div>
         </div>
-        <div class="compare" id="compareText">Юкланмоқда...</div>
+        <div class="compare" id="compareText">Yuklanmoqda...</div>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Xarajatlar (kategoriya)</h3>
+        </div>
+        <div class="breakdown" id="expenseSummary">
+          <div><span>Reklama</span><b>0</b></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Yangi xarajat</h3>
+        </div>
+        <form id="expenseForm">
+          <div class="breakdown">
+            <div>
+              <span>Kategoriya</span>
+              <select id="expenseCategory" class="btn ghost" style="width: 160px;"></select>
+            </div>
+            <div>
+              <span>Summa</span>
+              <input id="expenseAmount" class="btn ghost" type="number" min="0" step="1" />
+            </div>
+            <div>
+              <span>Izoh</span>
+              <input id="expenseNote" class="btn ghost" type="text" />
+            </div>
+          </div>
+          <button class="btn primary" type="submit">Saqlash</button>
+        </form>
       </div>
     </section>
 
     <section class="ai-section">
       <div class="panel ai">
         <div class="panel-header">
-          <h3>AI таҳлил</h3>
-          <span class="muted" id="aiStatus">Кутилмоқда</span>
+          <h3>AI tahlil</h3>
+          <span class="muted" id="aiStatus">Kutilmoqda</span>
         </div>
         <div class="ai-grid">
-          <div class="ai-card" id="aiInsight">Waiting for AI...</div>
-          <div class="ai-card" id="aiRecommend">Waiting for AI...</div>
-          <div class="ai-card" id="aiAnomaly">Waiting for AI...</div>
-          <div class="ai-card" id="aiProduct">Waiting for AI...</div>
+          <div class="ai-card" id="aiInsight">AI o'chirilgan</div>
+          <div class="ai-card" id="aiRecommend">AI o'chirilgan</div>
+          <div class="ai-card" id="aiAnomaly">AI o'chirilgan</div>
+          <div class="ai-card" id="aiProduct">AI o'chirilgan</div>
         </div>
       </div>
     </section>
@@ -106,15 +140,15 @@
     <section class="table-section">
       <div class="panel">
         <div class="panel-header">
-          <h3>Товарлар (SKU)</h3>
+          <h3>Tovarlar (SKU)</h3>
           <div class="actions">
-            <button class="btn ghost" id="syncSkuBtn">SKUларни янгилаш</button>
-            <span class="muted" id="productsCount">0 та</span>
+            <button class="btn ghost" id="syncSkuBtn">SKUlarni yangilash</button>
+            <span class="muted" id="productsCount">0 ta</span>
           </div>
         </div>
         <div class="panel-header">
           <div>
-            <label class="muted" for="skuSelect">SKU график</label>
+            <label class="muted" for="skuSelect">SKU grafik</label>
             <select id="skuSelect" class="btn ghost"></select>
           </div>
         </div>
@@ -124,21 +158,21 @@
             <thead>
               <tr>
                 <th>SKU</th>
-                <th>Номи</th>
-                <th>Таннарх</th>
-                <th>Сон</th>
-                <th>Даромад</th>
-                <th>Комиссия</th>
-                <th>Эквайринг</th>
-                <th>Логистика</th>
-                <th>Қайтариш</th>
+                <th>Nomi</th>
+                <th>Tannarx</th>
+                <th>Son</th>
+                <th>Daromad</th>
+                <th>Komissiya</th>
+                <th>Ekvayring</th>
+                <th>Logistika</th>
+                <th>Qaytarish</th>
                 <th>COGS</th>
-                <th>Фойда</th>
-                <th>Маржа</th>
+                <th>Foyda</th>
+                <th>Marja</th>
               </tr>
             </thead>
             <tbody id="productTable">
-              <tr><td colspan="11">Loading...</td></tr>
+              <tr><td colspan="12">Yuklanmoqda...</td></tr>
             </tbody>
           </table>
         </div>
