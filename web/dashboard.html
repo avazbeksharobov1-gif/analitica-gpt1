@@ -26,6 +26,7 @@
       </div>
 
       <div class="actions">
+        <select id="projectSelect" class="btn ghost"></select>
         <button class="btn" id="refreshBtn">Yangilash</button>
         <button class="btn ghost" id="syncRangeBtn">30 kunlik sync</button>
         <a class="btn ghost" id="exportExcel" href="#">Excel</a>
@@ -50,12 +51,22 @@
       <div class="card">
         <div class="kpi-label">Xarajat</div>
         <div class="kpi-value danger" id="kpi-expenses">0</div>
-        <div class="kpi-sub">Komissiya + ekvayring + logistika + qaytarish + xarajat + COGS</div>
+        <div class="kpi-sub">Komissiya + ekvayring + logistika + qaytarish + xarajat + COGS + soliq</div>
       </div>
       <div class="card">
         <div class="kpi-label">Foyda</div>
         <div class="kpi-value success" id="kpi-profit">0</div>
         <div class="kpi-sub" id="kpi-margin">Marja: 0%</div>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Tarif</h3>
+        </div>
+        <div class="compare" id="planInfo">Yuklanmoqda...</div>
+        <div class="actions" id="planActions"></div>
       </div>
     </section>
 
@@ -83,6 +94,8 @@
           <div><span>Logistika</span><b id="kpi-logistics">0</b></div>
           <div><span>Qaytarish</span><b id="kpi-returns">0</b></div>
           <div><span>Xarajat</span><b id="kpi-expenses-break">0</b></div>
+          <div><span>Soliq 1%</span><b id="kpi-tax1">0</b></div>
+          <div><span>Ijtimoiy soliq</span><b id="kpi-social-tax">0</b></div>
           <div><span>COGS</span><b id="kpi-cogs">0</b></div>
         </div>
         <div class="compare" id="compareText">Yuklanmoqda...</div>
@@ -118,6 +131,39 @@
             </div>
           </div>
           <button class="btn primary" type="submit">Saqlash</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Yandex tokenlar</h3>
+        </div>
+        <form id="tokenForm">
+          <div class="breakdown">
+            <div style="grid-column: 1 / -1;">
+              <span>API Keys (vergul bilan)</span>
+              <textarea id="tokenApiKeys" class="btn ghost" rows="2" style="width:100%"></textarea>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <span>Campaign IDs (vergul bilan)</span>
+              <input id="tokenCampaignIds" class="btn ghost" type="text" />
+            </div>
+            <div>
+              <span>Auth mode</span>
+              <select id="tokenAuthMode" class="btn ghost">
+                <option value="api-key">api-key</option>
+                <option value="bearer">bearer</option>
+              </select>
+            </div>
+            <div>
+              <span>Base URL</span>
+              <input id="tokenBaseUrl" class="btn ghost" type="text" />
+            </div>
+          </div>
+          <button class="btn primary" type="submit">Saqlash</button>
+          <div class="muted" id="tokenStatus"></div>
         </form>
       </div>
     </section>

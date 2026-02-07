@@ -1,6 +1,7 @@
 ﻿require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 
 const bot = require('./bot');
 const { setupAlerts } = require('./bot/alerts');
@@ -14,10 +15,19 @@ try {
 
 const dashboard = require('./web/dashboard');
 const admin = require('./web/admin');
+const authPages = require('./web/auth');
 const api = require('./web/api');
-const { ensureCategories, ensureProject } = require('./services/bootstrap');
+const {
+  ensureCategories,
+  ensureProject,
+  ensureAdminUser,
+  ensureAdminMemberships,
+  ensureAdminSubscription,
+  ensureSellerTokenFromEnv
+} = require('./services/bootstrap');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 8080;
 const WEBHOOK_URL =
   process.env.WEBHOOK_URL ||
@@ -37,12 +47,14 @@ const ADMIN_IDS = process.env.ADMIN_IDS
   : [];
 
 app.use(express.json());
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 app.get('/', (req, res) => res.redirect('/dashboard'));
 
 // WEB
 const addWebRoutes = () => {
+  authPages(app);
   dashboard(app);
   admin(app);
   api(app);
@@ -60,6 +72,10 @@ app.listen(PORT, async () => {
   try {
     await ensureCategories();
     await ensureProject();
+    const admin = await ensureAdminUser();
+    await ensureAdminMemberships(admin);
+    await ensureAdminSubscription(admin);
+    await ensureSellerTokenFromEnv();
   } catch (e) {
     console.error('Bootstrap error:', e.message);
   }

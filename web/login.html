@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login - Analitica</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script defer src="/auth.js"></script>
+</head>
+<body class="auth-body">
+  <div class="auth-card">
+    <h1>Analitica</h1>
+    <p>Kirish</p>
+
+    <form id="loginForm">
+      <input id="loginEmail" type="email" placeholder="Email" required />
+      <input id="loginPassword" type="password" placeholder="Parol" required />
+      <button class="btn primary" type="submit">Kirish</button>
+    </form>
+
+    <p class="muted">Akkaunt yoqmi? <a href="/register">Registratsiya</a></p>
+    <div id="loginError" class="muted"></div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Register - Analitica</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script defer src="/auth.js"></script>
+</head>
+<body class="auth-body">
+  <div class="auth-card">
+    <h1>Analitica</h1>
+    <p>Registratsiya</p>
+
+    <form id="registerForm">
+      <input id="regEmail" type="email" placeholder="Email" required />
+      <input id="regPhone" type="text" placeholder="Telefon (ixtiyoriy)" />
+      <input id="regPassword" type="password" placeholder="Parol" required />
+      <button class="btn primary" type="submit">Ro'yxatdan o'tish</button>
+    </form>
+
+    <p class="muted">Akkaunt bormi? <a href="/login">Kirish</a></p>
+    <div id="registerError" class="muted"></div>
+  </div>
+</body>
+</html>

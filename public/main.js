@@ -3,6 +3,8 @@ let dailyChart;
 let skuChart;
 let currentSku = '';
 let currentRange = '7d';
+let currentProjectId = null;
+let authReady = false;
 
 function fmt(n) {
   return Math.round(n || 0).toLocaleString();
@@ -38,15 +40,52 @@ function updateExportLinks() {
   if (pdf) pdf.href = `/api/export/pdf?${qs}`;
 }
 
+async function ensureAuth() {
+  if (authReady) return;
+  const r = await fetch('/api/auth/me');
+  if (r.status === 401) {
+    window.location.href = '/login';
+    return;
+  }
+  const data = await r.json();
+  if (!data || !data.ok) {
+    authReady = true;
+    return;
+  }
+  authReady = true;
+  currentProjectId = data.currentProjectId || (data.projects[0] && data.projects[0].id);
+  updateProjectSelect(data.projects || [], currentProjectId);
+}
+
+function updateProjectSelect(projects, currentId) {
+  const select = document.getElementById('projectSelect');
+  if (!select) return;
+  if (!projects.length) {
+    select.innerHTML = '<option value="">Project yoq</option>';
+    return;
+  }
+  select.innerHTML = projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  select.value = String(currentId || projects[0].id);
+}
+
 async function loadKpi(range) {
   const { from, to } = rangeToDates(range);
   const r = await fetch(`/api/stats?from=${from.toISOString()}&to=${to.toISOString()}`);
   const s = await r.json();
+  const tax1 = s.tax1 || 0;
+  const socialTax = s.socialTax || 0;
 
   document.getElementById('kpi-revenue').innerText = fmt(s.revenue);
   document.getElementById('kpi-orders').innerText = fmt(s.orders);
   document.getElementById('kpi-expenses').innerText = fmt(
-    s.expenses + s.fees + (s.acquiring || 0) + s.logistics + s.returns + s.cogs
+    s.expenses +
+      s.fees +
+      (s.acquiring || 0) +
+      s.logistics +
+      s.returns +
+      s.cogs +
+      tax1 +
+      socialTax
   );
   document.getElementById('kpi-profit').innerText = fmt(s.profit);
 
@@ -59,6 +98,8 @@ async function loadKpi(range) {
   document.getElementById('kpi-logistics').innerText = fmt(s.logistics);
   document.getElementById('kpi-returns').innerText = fmt(s.returns);
   document.getElementById('kpi-expenses-break').innerText = fmt(s.expenses);
+  document.getElementById('kpi-tax1').innerText = fmt(tax1);
+  document.getElementById('kpi-social-tax').innerText = fmt(socialTax);
   document.getElementById('kpi-cogs').innerText = fmt(s.cogs);
 }
 
@@ -158,10 +199,64 @@ async function loadExpenseCategories() {
   select.innerHTML = list.map(c => `<option value="${c.code}">${c.name}</option>`).join('');
 }
 
+async function loadPlan() {
+  const r = await fetch('/api/billing/plan');
+  if (!r.ok) return;
+  const d = await r.json();
+  if (!d || !d.ok) return;
+  const plan = d.plan;
+  const info = document.getElementById('planInfo');
+  const actions = document.getElementById('planActions');
+  if (info) {
+    info.innerText =
+      `Tarif: ${plan.name} (${plan.price} so'm)\n` +
+      `Magazin limiti: ${plan.projectLimit} ta\n` +
+      `Sizda: ${d.projectCount} ta`;
+  }
+
+  if (actions) {
+    actions.innerHTML = '';
+    if (d.testMode) {
+      ['FREE', 'PRO', 'BUSINESS'].forEach((code) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn ghost';
+        btn.innerText = `${code} (test)`;
+        btn.onclick = async () => {
+          await fetch('/api/billing/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan: code })
+          });
+          loadPlan();
+        };
+        actions.appendChild(btn);
+      });
+    } else {
+      actions.innerHTML = '<span class="muted">Payme/Click orqali tolov</span>';
+    }
+  }
+}
+
+async function loadTokenConfig() {
+  const r = await fetch('/api/tokens');
+  if (!r.ok) return;
+  const list = await r.json();
+  if (!Array.isArray(list) || !list.length) return;
+  const t = list[0];
+  const apiKeys = document.getElementById('tokenApiKeys');
+  const campaignIds = document.getElementById('tokenCampaignIds');
+  const baseUrl = document.getElementById('tokenBaseUrl');
+  const authMode = document.getElementById('tokenAuthMode');
+  if (apiKeys) apiKeys.value = '';
+  if (campaignIds) campaignIds.value = t.campaignIds || '';
+  if (baseUrl) baseUrl.value = t.baseUrl || 'https://api.partner.market.yandex.ru';
+  if (authMode) authMode.value = t.authMode || 'api-key';
+}
+
 async function loadProducts(range) {
   const { from, to } = rangeToDates(range);
   const [productsRes, metricsRes] = await Promise.all([
-    fetch('/api/products?project=1'),
+    fetch('/api/products'),
     fetch(`/api/products/profit?from=${from.toISOString()}&to=${to.toISOString()}`)
   ]);
   const products = await productsRes.json();
@@ -279,6 +374,7 @@ async function loadAI() {
 }
 
 async function loadAll() {
+  await ensureAuth();
   const [_, __, ___, ____, products] = await Promise.all([
     loadKpi(currentRange),
     loadCompare(),
@@ -290,6 +386,7 @@ async function loadAll() {
   updateExportLinks();
   updateSkuSelect(products || []);
   loadExpenseSummary(currentRange);
+  loadPlan();
 }
 
 function setupRangeButtons() {
@@ -306,6 +403,21 @@ function setupRangeButtons() {
 function setupActions() {
   document.getElementById('refreshBtn').addEventListener('click', loadAll);
   document.getElementById('aiBtn').addEventListener('click', loadAI);
+
+  const projectSelect = document.getElementById('projectSelect');
+  if (projectSelect) {
+    projectSelect.addEventListener('change', async () => {
+      const projectId = Number(projectSelect.value || 0);
+      if (!projectId) return;
+      await fetch('/api/auth/select-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId })
+      });
+      currentProjectId = projectId;
+      loadAll();
+    });
+  }
 
   const syncBtn = document.getElementById('syncSkuBtn');
   if (syncBtn) {
@@ -356,6 +468,25 @@ function setupActions() {
       document.getElementById('expenseAmount').value = '';
       document.getElementById('expenseNote').value = '';
       loadAll();
+    });
+  }
+
+  const tokenForm = document.getElementById('tokenForm');
+  if (tokenForm) {
+    tokenForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const apiKeys = document.getElementById('tokenApiKeys').value;
+      const campaignIds = document.getElementById('tokenCampaignIds').value;
+      const baseUrl = document.getElementById('tokenBaseUrl').value;
+      const authMode = document.getElementById('tokenAuthMode').value;
+      const status = document.getElementById('tokenStatus');
+      status.innerText = 'Saqlanmoqda...';
+      await fetch('/api/tokens/seller', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKeys, campaignIds, baseUrl, authMode })
+      });
+      status.innerText = 'Saqlandi';
     });
   }
 }
@@ -429,3 +560,4 @@ setupActions();
 loadAll();
 loadAI();
 loadExpenseCategories();
+loadTokenConfig();
