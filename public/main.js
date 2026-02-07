@@ -1,4 +1,5 @@
 let chart;
+let dailyChart;
 let currentRange = '7d';
 
 function fmt(n) {
@@ -94,6 +95,37 @@ async function loadForecast() {
   });
 }
 
+async function loadDailySeries(range) {
+  const { from, to } = rangeToDates(range);
+  const r = await fetch(`/api/series?from=${from.toISOString()}&to=${to.toISOString()}`);
+  const rows = await r.json();
+  if (!Array.isArray(rows)) return;
+
+  const labels = rows.map(r => r.date);
+  const revenue = rows.map(r => r.revenue || 0);
+  const profit = rows.map(r => r.profit || 0);
+
+  const data = {
+    labels,
+    datasets: [
+      { label: 'Revenue', data: revenue, borderColor: '#2563eb', tension: 0.35 },
+      { label: 'Profit', data: profit, borderColor: '#16a34a', tension: 0.35 }
+    ]
+  };
+
+  if (dailyChart) {
+    dailyChart.data = data;
+    dailyChart.update();
+    return;
+  }
+
+  dailyChart = new Chart(document.getElementById('dailyChart'), {
+    type: 'line',
+    data,
+    options: { plugins: { legend: { position: 'bottom' } } }
+  });
+}
+
 async function loadProducts(range) {
   const { from, to } = rangeToDates(range);
   const r = await fetch(`/api/products/profit?from=${from.toISOString()}&to=${to.toISOString()}`);
@@ -155,7 +187,13 @@ async function loadAI() {
 }
 
 async function loadAll() {
-  await Promise.all([loadKpi(currentRange), loadCompare(), loadForecast(), loadProducts(currentRange)]);
+  await Promise.all([
+    loadKpi(currentRange),
+    loadCompare(),
+    loadForecast(),
+    loadDailySeries(currentRange),
+    loadProducts(currentRange)
+  ]);
   document.getElementById('lastUpdated').innerText = `Updated: ${new Date().toLocaleString()}`;
   updateExportLinks();
 }

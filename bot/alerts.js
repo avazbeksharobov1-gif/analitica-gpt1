@@ -1,40 +1,125 @@
-﻿const cron = require('node-cron');
+const cron = require('node-cron');
 const { prisma } = require('../services/db');
-const { getCompareStats } = require('../services/analytics');
+const { getCompareStats, getKpi } = require('../services/analytics');
 const { aiInsight } = require('../services/ai');
 
+function dateRangeForDay(offsetDays) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const from = new Date(d);
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(d);
+  to.setHours(23, 59, 59, 999);
+  return { from, to, label: d.toISOString().slice(0, 10) };
+}
+
+async function getTargets(projectId, adminIds) {
+  if (adminIds && adminIds.length) return adminIds;
+  const alerts = await prisma.alertSetting.findMany({
+    where: { projectId, enabled: true }
+  });
+  return alerts.map(a => a.chatId);
+}
+
 function setupAlerts(bot, ADMIN_IDS = []) {
-  cron.schedule('*/30 * * * *', async () => {
+  const AI_DISABLED = process.env.DISABLE_AI === 'true';
+  const tz = process.env.CRON_TZ || 'Asia/Tashkent';
+  const weeklyCron = process.env.ALERT_WEEKLY_CRON || '*/30 * * * *';
+  const dailyCron = process.env.ALERT_DAILY_CRON || '20 6 * * *';
+  const profitDropPct = Number(process.env.ALERT_PROFIT_DROP_PCT || 10);
+  const revenueDropPct = Number(process.env.ALERT_REVENUE_DROP_PCT || 15);
+  const marginMinPct = Number(process.env.ALERT_MARGIN_MIN_PCT || 10);
+  const cooldownMin = Number(process.env.ALERT_COOLDOWN_MIN || 360);
+
+  const lastSent = new Map();
+  const canSend = (key) => {
+    const now = Date.now();
+    const last = lastSent.get(key) || 0;
+    if (now - last < cooldownMin * 60 * 1000) return false;
+    lastSent.set(key, now);
+    return true;
+  };
+
+  // Weekly compare alert (profit & revenue drop)
+  cron.schedule(weeklyCron, async () => {
     try {
       const project = await prisma.project.findFirst({ orderBy: { id: 'asc' } });
       if (!project) return;
 
       const { thisWeek, lastWeek } = await getCompareStats(project.id);
-      if (lastWeek.profit === 0) return;
+      if (!lastWeek || lastWeek.revenue === 0) return;
 
-      if (thisWeek.profit < lastWeek.profit * 0.9) {
-        const text = await aiInsight(lastWeek.revenue, thisWeek.revenue);
-        const alerts = await prisma.alertSetting.findMany({
-          where: { projectId: project.id, enabled: true }
-        });
+      const profitDrop = lastWeek.profit > 0
+        ? ((lastWeek.profit - thisWeek.profit) / lastWeek.profit) * 100
+        : 0;
+      const revenueDrop = lastWeek.revenue > 0
+        ? ((lastWeek.revenue - thisWeek.revenue) / lastWeek.revenue) * 100
+        : 0;
 
-        const targets = alerts.length ? alerts.map(a => a.chatId) : ADMIN_IDS;
+      if (profitDrop >= profitDropPct || revenueDrop >= revenueDropPct) {
+        if (!canSend(`weekly:${project.id}`)) return;
+        const targets = await getTargets(project.id, ADMIN_IDS);
+        if (!targets.length) return;
+
+        let insight = '';
+        if (!AI_DISABLED) {
+          try {
+            insight = await aiInsight(lastWeek.revenue, thisWeek.revenue);
+          } catch (_) {
+            insight = '';
+          }
+        }
+
         const msg =
-          `AI ALERT\n\nProfit dropped!\n\n` +
+          `ALERT: Weekly drop\nProject: ${project.name}\n\n` +
+          `Revenue last week: ${lastWeek.revenue}\n` +
+          `Revenue this week: ${thisWeek.revenue}\n` +
+          `Revenue drop: ${revenueDrop.toFixed(1)}%\n\n` +
           `Profit last week: ${lastWeek.profit}\n` +
           `Profit this week: ${thisWeek.profit}\n` +
-          `Revenue last week: ${lastWeek.revenue}\n` +
-          `Revenue this week: ${thisWeek.revenue}\n\n` +
-          `AI insight:\n${text}`;
+          `Profit drop: ${profitDrop.toFixed(1)}%` +
+          (insight ? `\n\nAI insight:\n${insight}` : '');
 
         for (const id of targets) {
           await bot.telegram.sendMessage(id, msg);
         }
       }
     } catch (e) {
-      console.error('ALERT ERROR:', e.message);
+      console.error('ALERT WEEKLY ERROR:', e.message);
     }
-  });
+  }, { timezone: tz });
+
+  // Daily margin/profit alert
+  cron.schedule(dailyCron, async () => {
+    try {
+      const { from, to, label } = dateRangeForDay(-1);
+      const projects = await prisma.project.findMany({ where: { isActive: true } });
+      for (const p of projects) {
+        const s = await getKpi(p.id, from, to);
+        if (s.revenue === 0 && s.orders === 0) continue;
+
+        const margin = s.revenue ? (s.profit / s.revenue) * 100 : 0;
+        if (s.profit < 0 || margin < marginMinPct) {
+          const targets = await getTargets(p.id, ADMIN_IDS);
+          if (!targets.length) continue;
+
+          const msg =
+            `ALERT: Daily margin/profit\nProject: ${p.name}\nDate: ${label}\n\n` +
+            `Revenue: ${s.revenue}\n` +
+            `Orders: ${s.orders}\n` +
+            `Profit: ${s.profit}\n` +
+            `Margin: ${margin.toFixed(1)}%\n\n` +
+            `Thresholds: margin < ${marginMinPct}% or profit < 0`;
+
+          for (const id of targets) {
+            await bot.telegram.sendMessage(id, msg);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('ALERT DAILY ERROR:', e.message);
+    }
+  }, { timezone: tz });
 }
 
 module.exports = { setupAlerts };

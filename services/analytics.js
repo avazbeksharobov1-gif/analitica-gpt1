@@ -13,6 +13,16 @@ function rangeDates(from, to) {
   return { start, end };
 }
 
+function dateKey(d) {
+  return toDateOnly(d).toISOString().slice(0, 10);
+}
+
+function addDays(d, n) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
 async function sumExpenses(projectId, from, to) {
   const { start, end } = rangeDates(from, to);
   const r = await prisma.expense.aggregate({
@@ -196,6 +206,103 @@ async function getProductProfit(projectId, from, to) {
   return result.sort((a, b) => b.profit - a.profit);
 }
 
+async function getDailySeries(projectId, from, to) {
+  const { start, end } = rangeDates(from, to);
+
+  const [dailyRows, expenseRows, itemRows, products] = await Promise.all([
+    prisma.sellerDaily.findMany({
+      where: { projectId, date: { gte: start, lte: end } },
+      orderBy: { date: 'asc' }
+    }),
+    prisma.expense.findMany({
+      where: { projectId, date: { gte: start, lte: end } }
+    }),
+    prisma.sellerItemDaily.findMany({
+      where: { projectId, date: { gte: start, lte: end } }
+    }),
+    prisma.product.findMany({ where: { projectId } })
+  ]);
+
+  const costMap = new Map(products.map(p => [p.sku, p.costPrice]));
+  const dailyMap = new Map();
+
+  for (const r of dailyRows) {
+    dailyMap.set(dateKey(r.date), {
+      revenue: r.revenue || 0,
+      orders: r.orders || 0,
+      fees: r.fees || 0,
+      acquiring: r.acquiring || 0,
+      logistics: r.logistics || 0,
+      returns: r.returns || 0,
+      expenses: 0,
+      cogs: 0
+    });
+  }
+
+  for (const e of expenseRows) {
+    const key = dateKey(e.date);
+    const row = dailyMap.get(key) || {
+      revenue: 0,
+      orders: 0,
+      fees: 0,
+      acquiring: 0,
+      logistics: 0,
+      returns: 0,
+      expenses: 0,
+      cogs: 0
+    };
+    row.expenses += e.amount || 0;
+    dailyMap.set(key, row);
+  }
+
+  for (const it of itemRows) {
+    const key = dateKey(it.date);
+    const row = dailyMap.get(key) || {
+      revenue: 0,
+      orders: 0,
+      fees: 0,
+      acquiring: 0,
+      logistics: 0,
+      returns: 0,
+      expenses: 0,
+      cogs: 0
+    };
+    const cost = costMap.get(it.sku) || 0;
+    row.cogs += (it.quantity || 0) * cost;
+    dailyMap.set(key, row);
+  }
+
+  const result = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    const key = dateKey(d);
+    const row = dailyMap.get(key) || {
+      revenue: 0,
+      orders: 0,
+      fees: 0,
+      acquiring: 0,
+      logistics: 0,
+      returns: 0,
+      expenses: 0,
+      cogs: 0
+    };
+    const profit =
+      row.revenue -
+      row.fees -
+      row.acquiring -
+      row.logistics -
+      row.returns -
+      row.expenses -
+      row.cogs;
+    result.push({
+      date: key,
+      ...row,
+      profit
+    });
+  }
+
+  return result;
+}
+
 module.exports = {
   getKpi,
   getCompareStats,
@@ -203,5 +310,6 @@ module.exports = {
   listProjects,
   getProject,
   addExpense,
-  getProductProfit
+  getProductProfit,
+  getDailySeries
 };

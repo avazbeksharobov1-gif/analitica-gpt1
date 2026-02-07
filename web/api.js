@@ -2,7 +2,8 @@ const {
   getKpi,
   getCompareStats,
   getForecastCompare,
-  getProductProfit
+  getProductProfit,
+  getDailySeries
 } = require('../services/analytics');
 const { aiInsight, aiRecommend, aiAnomalyDetect, aiProductProfit } = require('../services/ai');
 const { syncDay } = require('../services/ingest');
@@ -92,6 +93,17 @@ module.exports = (app) => {
   app.get('/api/forecast-compare', async (req, res) => {
     const projectId = req.query.project ? Number(req.query.project) : 1;
     res.json(await getForecastCompare(projectId));
+  });
+
+  app.get('/api/series', async (req, res) => {
+    try {
+      const projectId = req.query.project ? Number(req.query.project) : 1;
+      const from = req.query.from ? new Date(req.query.from) : new Date();
+      const to = req.query.to ? new Date(req.query.to) : new Date();
+      res.json(await getDailySeries(projectId, from, to));
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
   });
 
   app.get('/api/insight', async (req, res) => {
