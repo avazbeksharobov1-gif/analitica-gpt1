@@ -19,7 +19,11 @@ const { ensureCategories, ensureProject } = require('./services/bootstrap');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-const WEBHOOK_URL = process.env.WEBHOOK_URL;
+const WEBHOOK_URL =
+  process.env.WEBHOOK_URL ||
+  (process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : '');
 
 const ADMIN_IDS = process.env.ADMIN_IDS
   ? process.env.ADMIN_IDS.split(',').map(String)
@@ -58,10 +62,12 @@ app.listen(PORT, async () => {
   setupBotCron(bot, ADMIN_IDS);
   if (setupCron) setupCron(bot);
 
+  console.log('Webhook mode:', WEBHOOK_URL ? 'ON' : 'OFF');
   if (WEBHOOK_URL) {
     await bot.telegram.setWebhook(`${WEBHOOK_URL}/telegram`);
     console.log('Webhook connected');
   } else {
+    await bot.telegram.deleteWebhook();
     await bot.launch();
     console.log('Bot launched (long polling)');
   }
