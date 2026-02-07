@@ -11,10 +11,12 @@ const { syncDay } = require('../services/ingest');
 const { prisma } = require('../services/db');
 const { generatePDFBuffer } = require('../services/report');
 const QuickChart = require('quickchart-js');
+const { Markup } = require('telegraf');
 
 const AI_DISABLED = process.env.DISABLE_AI === 'true';
 
 const projectByChat = new Map();
+const expenseFlow = new Map();
 
 const CATEGORY_ALIASES = {
   marketing: 'marketing',
@@ -49,6 +51,21 @@ function getProjectId(ctx) {
   return projectByChat.get(String(ctx.chat.id)) || 1;
 }
 
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
+
+async function showExpenseCategories(ctx) {
+  const list = await prisma.expenseCategory.findMany({ orderBy: { id: 'asc' } });
+  const buttons = list.map((c) => c.name);
+  const rows = chunk(buttons, 2).map((row) => row.map((t) => Markup.button.text(t)));
+  await ctx.reply('Kategoriya tanlang', Markup.keyboard(rows).oneTime().resize());
+}
+
 function setupCommands(bot) {
   bot.start(async (ctx) => {
     const p = await getOrCreateProject();
@@ -60,6 +77,7 @@ function setupCommands(bot) {
         '/compare - Week compare\n' +
         '/forecast - 30 day forecast\n' +
         '/report [days] - PDF report (default 7)\n' +
+        '/harajat - xarajat kiritish (tugma)\n' +
         '/insight - AI insight\n' +
         '/recommend - AI recommendations\n' +
         '/sync [YYYY-MM-DD] - Sync seller data\n' +
@@ -144,6 +162,18 @@ function setupCommands(bot) {
         `Today: ${today}\n` +
         `After 30 days: ${day30}`
     );
+  });
+
+  bot.command(['harajat', 'xarajat'], async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    expenseFlow.set(chatId, { step: 'category', projectId: getProjectId(ctx) });
+    await showExpenseCategories(ctx);
+  });
+
+  bot.command('cancel', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    expenseFlow.delete(chatId);
+    ctx.reply('Bekor qilindi', Markup.removeKeyboard());
   });
 
   bot.command('report', async (ctx) => {
@@ -266,6 +296,41 @@ function setupCommands(bot) {
       ctx.reply('Added');
     } catch (e) {
       ctx.reply('Failed to add expense');
+    }
+  });
+
+  bot.on('text', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    const state = expenseFlow.get(chatId);
+    if (!state) return;
+
+    const text = ctx.message.text.trim();
+    if (text.startsWith('/')) return;
+
+    if (state.step === 'category') {
+      const key = text.toLowerCase();
+      const cat = await prisma.expenseCategory.findFirst({
+        where: {
+          OR: [{ code: key }, { name: text }]
+        }
+      });
+      if (!cat) {
+        return ctx.reply('Kategoriya topilmadi. Qayta tanlang.');
+      }
+      expenseFlow.set(chatId, { step: 'amount', projectId: state.projectId, categoryCode: cat.code });
+      return ctx.reply('Summani kiriting (masalan: 150000 Izoh)', Markup.removeKeyboard());
+    }
+
+    if (state.step === 'amount') {
+      const parts = text.split(/\s+/);
+      const amount = Number(parts[0]);
+      if (Number.isNaN(amount)) {
+        return ctx.reply('Summa xato. Faqat raqam kiriting.');
+      }
+      const note = parts.slice(1).join(' ') || null;
+      await addExpense(state.projectId, state.categoryCode, amount, note);
+      expenseFlow.delete(chatId);
+      return ctx.reply("Xarajat qo'shildi ✅");
     }
   });
 }
