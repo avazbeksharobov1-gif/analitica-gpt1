@@ -30,10 +30,24 @@ async function syncDay(projectId, date) {
   const day = toDateOnly(date);
   const dateStr = day.toISOString().slice(0, 10);
 
+  const errors = {};
+
   const [ordersData, returnsData, payoutsData] = await Promise.all([
-    fetchOrdersByDate(dateStr, dateStr).catch(() => ({ orders: [] })),
-    fetchReturnsByDate(dateStr, dateStr).catch(() => ({ returns: [] })),
-    fetchPayoutsByDate(dateStr, dateStr).catch(() => ({ payouts: [] }))
+    fetchOrdersByDate(dateStr, dateStr).catch((e) => {
+      errors.orders = e.message || String(e);
+      console.error('Yandex orders error:', e.message);
+      return { orders: [] };
+    }),
+    fetchReturnsByDate(dateStr, dateStr).catch((e) => {
+      errors.returns = e.message || String(e);
+      console.error('Yandex returns error:', e.message);
+      return { returns: [] };
+    }),
+    fetchPayoutsByDate(dateStr, dateStr).catch((e) => {
+      errors.payouts = e.message || String(e);
+      console.error('Yandex payouts error:', e.message);
+      return { payouts: [] };
+    })
   ]);
 
   const orders = ordersData.orders || [];
@@ -182,7 +196,7 @@ async function syncDay(projectId, date) {
     });
   }
 
-  return { revenue, orders: ordersCount, fees, acquiring, logistics, returns: returnsSum };
+  return { revenue, orders: ordersCount, fees, acquiring, logistics, returns: returnsSum, errors };
 }
 
 module.exports = { syncDay };
