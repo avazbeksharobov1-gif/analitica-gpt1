@@ -3,12 +3,21 @@ const fetch = require('node-fetch');
 const BASE_URL = process.env.YANDEX_SELLER_BASE_URL || 'https://api.partner.market.yandex.ru';
 const API_KEY = process.env.YANDEX_SELLER_API_KEY;
 const CAMPAIGN_ID = process.env.YANDEX_SELLER_CAMPAIGN_ID;
+const AUTH_MODE = (process.env.YANDEX_SELLER_AUTH_MODE || 'api-key').toLowerCase();
 
 function headers() {
-  return {
-    Authorization: `Bearer ${API_KEY}`,
-    'Content-Type': 'application/json'
+  const h = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
   };
+  if (!API_KEY) return h;
+
+  if (AUTH_MODE === 'bearer' || AUTH_MODE === 'oauth') {
+    h.Authorization = `Bearer ${API_KEY}`;
+  } else {
+    h['Api-Key'] = API_KEY;
+  }
+  return h;
 }
 
 async function request(path, options = {}) {
