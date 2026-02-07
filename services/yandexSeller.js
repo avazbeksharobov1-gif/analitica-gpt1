@@ -6,12 +6,20 @@ const CAMPAIGN_ID = process.env.YANDEX_SELLER_CAMPAIGN_ID;
 const AUTH_MODE = (process.env.YANDEX_SELLER_AUTH_MODE || 'api-key').toLowerCase();
 
 function getCampaignIds() {
-  if (process.env.YANDEX_SELLER_CAMPAIGN_IDS) {
-    return process.env.YANDEX_SELLER_CAMPAIGN_IDS.split(',')
+  const fromIds = process.env.YANDEX_SELLER_CAMPAIGN_IDS;
+  if (fromIds) {
+    return fromIds
+      .split(/[,\s;]+/)
       .map((v) => v.trim())
       .filter(Boolean);
   }
-  return CAMPAIGN_ID ? [CAMPAIGN_ID] : [];
+  if (CAMPAIGN_ID) {
+    return CAMPAIGN_ID
+      .split(/[,\s;]+/)
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+  return [];
 }
 
 function headers() {
