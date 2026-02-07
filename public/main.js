@@ -8,6 +8,13 @@ function fmt(n) {
   return Math.round(n || 0).toLocaleString();
 }
 
+function rangeLabel(range) {
+  if (range === '7d') return '7 кун';
+  if (range === '30d') return '30 кун';
+  if (range === 'today') return 'Бугун';
+  return range;
+}
+
 function rangeToDates(range) {
   const to = new Date();
   const from = new Date();
@@ -45,7 +52,7 @@ async function loadKpi(range) {
 
   const margin = s.revenue ? (s.profit / s.revenue) * 100 : 0;
   document.getElementById('kpi-margin').innerText = `Margin: ${margin.toFixed(1)}%`;
-  document.getElementById('kpi-range').innerText = `Range: ${range}`;
+  document.getElementById('kpi-range').innerText = `Давр: ${rangeLabel(range)}`;
 
   document.getElementById('kpi-fees').innerText = fmt(s.fees);
   document.getElementById('kpi-acquiring').innerText = fmt(s.acquiring || 0);
@@ -67,8 +74,8 @@ async function loadCompare() {
   const sign = diff >= 0 ? '+' : '';
   const signP = diffProfit >= 0 ? '+' : '';
   document.getElementById('compareText').innerText =
-    `Revenue this week: ${fmt(curr)}\nRevenue last week: ${fmt(prev)}\nRevenue change: ${sign}${diff.toFixed(1)}%\n\n` +
-    `Profit this week: ${fmt(currProfit)}\nProfit last week: ${fmt(prevProfit)}\nProfit change: ${signP}${diffProfit.toFixed(1)}%`;
+    `Даромад (шу ҳафта): ${fmt(curr)}\nДаромад (ўтган ҳафта): ${fmt(prev)}\nЎзгариш: ${sign}${diff.toFixed(1)}%\n\n` +
+    `Фойда (шу ҳафта): ${fmt(currProfit)}\nФойда (ўтган ҳафта): ${fmt(prevProfit)}\nЎзгариш: ${signP}${diffProfit.toFixed(1)}%`;
 }
 
 async function loadForecast() {
@@ -130,18 +137,62 @@ async function loadDailySeries(range) {
 
 async function loadProducts(range) {
   const { from, to } = rangeToDates(range);
-  const r = await fetch(`/api/products/profit?from=${from.toISOString()}&to=${to.toISOString()}`);
-  const items = await r.json();
+  const [productsRes, metricsRes] = await Promise.all([
+    fetch('/api/products?project=1'),
+    fetch(`/api/products/profit?from=${from.toISOString()}&to=${to.toISOString()}`)
+  ]);
+  const products = await productsRes.json();
+  const metrics = await metricsRes.json();
 
   const tbody = document.getElementById('productTable');
   const count = document.getElementById('productsCount');
-  if (!Array.isArray(items)) {
-    tbody.innerHTML = '<tr><td colspan="12">No data</td></tr>';
-    count.innerText = '0 items';
+  if (!Array.isArray(products) || !Array.isArray(metrics)) {
+    tbody.innerHTML = "<tr><td colspan=\"12\">Маълумот йўқ</td></tr>";
+    count.innerText = '0 та';
     return [];
   }
 
-  count.innerText = `${items.length} items`;
+  const metricMap = new Map(metrics.map(m => [m.sku, m]));
+  const productSkus = new Set(products.map(p => p.sku));
+
+  const items = products.map((p) => {
+    const m = metricMap.get(p.sku) || {
+      quantity: 0,
+      revenue: 0,
+      fees: 0,
+      acquiring: 0,
+      logistics: 0,
+      returns: 0,
+      cogs: 0,
+      profit: 0
+    };
+    return {
+      sku: p.sku,
+      name: p.name,
+      costPrice: p.costPrice,
+      ...m
+    };
+  });
+
+  for (const m of metrics) {
+    if (!productSkus.has(m.sku)) {
+      items.push({
+        sku: m.sku,
+        name: m.name || m.sku,
+        costPrice: 0,
+        quantity: m.quantity || 0,
+        revenue: m.revenue || 0,
+        fees: m.fees || 0,
+        acquiring: m.acquiring || 0,
+        logistics: m.logistics || 0,
+        returns: m.returns || 0,
+        cogs: m.cogs || 0,
+        profit: m.profit || 0
+      });
+    }
+  }
+
+  count.innerText = `${items.length} та`;
   tbody.innerHTML = items.map((p) => {
     const margin = p.revenue ? (p.profit / p.revenue) * 100 : 0;
     return `
@@ -180,7 +231,7 @@ async function loadProducts(range) {
 
 async function loadAI() {
   const set = (id, text) => (document.getElementById(id).innerText = text);
-  document.getElementById('aiStatus').innerText = 'Loading...';
+  document.getElementById('aiStatus').innerText = 'Юкланмоқда...';
 
   try {
     const [insight, recommend, anomaly, product] = await Promise.all([
@@ -190,17 +241,17 @@ async function loadAI() {
       fetch('/api/products/insight').then(r => r.text())
     ]);
 
-    set('aiInsight', insight || 'No data');
-    set('aiRecommend', recommend || 'No data');
-    set('aiAnomaly', anomaly || 'No data');
-    set('aiProduct', product || 'No data');
-    document.getElementById('aiStatus').innerText = 'Ready';
+    set('aiInsight', insight || 'Маълумот йўқ');
+    set('aiRecommend', recommend || 'Маълумот йўқ');
+    set('aiAnomaly', anomaly || 'Маълумот йўқ');
+    set('aiProduct', product || 'Маълумот йўқ');
+    document.getElementById('aiStatus').innerText = 'Тайёр';
   } catch (e) {
-    set('aiInsight', 'AI not available');
-    set('aiRecommend', 'AI not available');
-    set('aiAnomaly', 'AI not available');
-    set('aiProduct', 'AI not available');
-    document.getElementById('aiStatus').innerText = 'Error';
+    set('aiInsight', 'AI мавжуд эмас');
+    set('aiRecommend', 'AI мавжуд эмас');
+    set('aiAnomaly', 'AI мавжуд эмас');
+    set('aiProduct', 'AI мавжуд эмас');
+    document.getElementById('aiStatus').innerText = 'Хато';
   }
 }
 
@@ -212,7 +263,7 @@ async function loadAll() {
     loadDailySeries(currentRange),
     loadProducts(currentRange)
   ]);
-  document.getElementById('lastUpdated').innerText = `Updated: ${new Date().toLocaleString()}`;
+  document.getElementById('lastUpdated').innerText = `Янгиланди: ${new Date().toLocaleString()}`;
   updateExportLinks();
   updateSkuSelect(products || []);
 }
@@ -231,6 +282,21 @@ function setupRangeButtons() {
 function setupActions() {
   document.getElementById('refreshBtn').addEventListener('click', loadAll);
   document.getElementById('aiBtn').addEventListener('click', loadAI);
+  const syncBtn = document.getElementById('syncSkuBtn');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', async () => {
+      syncBtn.disabled = true;
+      syncBtn.innerText = 'Юкланмоқда...';
+      try {
+        await fetch('/api/products/sync', { method: 'POST' });
+        await loadAll();
+      } catch (e) {
+        // ignore
+      }
+      syncBtn.disabled = false;
+      syncBtn.innerText = 'SKUларни янгилаш';
+    });
+  }
 }
 
 async function saveCost(sku, name, costPrice) {

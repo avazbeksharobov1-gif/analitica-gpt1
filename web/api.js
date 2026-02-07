@@ -11,6 +11,7 @@ const { syncDay } = require('../services/ingest');
 const { prisma } = require('../services/db');
 const { writeExcel } = require('../exporter');
 const { generatePDFStream } = require('../services/report');
+const { syncCatalog } = require('../services/catalog');
 
 module.exports = (app) => {
   const AI_DISABLED = process.env.DISABLE_AI === 'true';
@@ -219,6 +220,16 @@ module.exports = (app) => {
       }
     });
     res.json(p);
+  });
+
+  app.post('/api/products/sync', async (req, res) => {
+    try {
+      const projectId = Number(req.body.projectId || 1);
+      const r = await syncCatalog(projectId);
+      res.json({ ok: true, data: r });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
   });
 
   app.post('/api/products/cost', async (req, res) => {

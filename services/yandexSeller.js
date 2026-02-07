@@ -82,10 +82,22 @@ async function fetchPayoutsByDate(dateFrom, dateTo, campaignId, apiKey) {
   return request(`/campaigns/${campaignId}/payouts?fromDate=${dateFrom}&toDate=${dateTo}`, apiKey);
 }
 
+async function fetchOfferMappingEntries(campaignId, apiKey, pageToken) {
+  if (!campaignId) {
+    throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
+  }
+  const params = new URLSearchParams();
+  params.set('limit', '200');
+  params.set('mapping_kind', 'ALL');
+  if (pageToken) params.set('page_token', pageToken);
+  return request(`/campaigns/${campaignId}/offer-mapping-entries?${params.toString()}`, apiKey);
+}
+
 module.exports = {
   getCampaignIds,
   getApiKeys,
   fetchOrdersByDate,
   fetchReturnsByDate,
-  fetchPayoutsByDate
+  fetchPayoutsByDate,
+  fetchOfferMappingEntries
 };

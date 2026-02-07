@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Analitica Dashboard</title>
+  <title>Analitika Paneli</title>
   <link rel="stylesheet" href="/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script defer src="/main.js"></script>
@@ -15,21 +15,21 @@
         <span class="logo">A</span>
         <div>
           <div class="title">Analitica</div>
-          <div class="subtitle">Market Analytics + AI</div>
+          <div class="subtitle">Market analitika + AI</div>
         </div>
       </div>
 
       <div class="range">
-        <button class="btn ghost active" data-range="7d">7 days</button>
-        <button class="btn ghost" data-range="30d">30 days</button>
-        <button class="btn ghost" data-range="today">Today</button>
+        <button class="btn ghost active" data-range="7d">7 кун</button>
+        <button class="btn ghost" data-range="30d">30 кун</button>
+        <button class="btn ghost" data-range="today">Бугун</button>
       </div>
 
       <div class="actions">
-        <button class="btn" id="refreshBtn">Refresh</button>
+        <button class="btn" id="refreshBtn">Янгилаш</button>
         <a class="btn ghost" id="exportExcel" href="#">Excel</a>
         <a class="btn ghost" id="exportPdf" href="#">PDF</a>
-        <button class="btn primary" id="aiBtn">AI Update</button>
+        <button class="btn primary" id="aiBtn">AI янгилаш</button>
       </div>
     </div>
   </header>
@@ -37,62 +37,62 @@
   <main class="wrap">
     <section class="kpi-grid">
       <div class="card">
-        <div class="kpi-label">Revenue</div>
+        <div class="kpi-label">Даромад</div>
         <div class="kpi-value" id="kpi-revenue">0</div>
-        <div class="kpi-sub" id="kpi-range">Range: 7 days</div>
+        <div class="kpi-sub" id="kpi-range">Давр: 7 кун</div>
       </div>
       <div class="card">
-        <div class="kpi-label">Orders</div>
+        <div class="kpi-label">Буюртмалар</div>
         <div class="kpi-value" id="kpi-orders">0</div>
-        <div class="kpi-sub">Total orders</div>
+        <div class="kpi-sub">Жами буюртма</div>
       </div>
       <div class="card">
-        <div class="kpi-label">Expenses</div>
+        <div class="kpi-label">Харажат</div>
         <div class="kpi-value danger" id="kpi-expenses">0</div>
-        <div class="kpi-sub">Fees + acquiring + logistics + returns + expenses + COGS</div>
+        <div class="kpi-sub">Комиссия + эквайринг + логистика + қайтариш + харажат + COGS</div>
       </div>
       <div class="card">
-        <div class="kpi-label">Profit</div>
+        <div class="kpi-label">Фойда</div>
         <div class="kpi-value success" id="kpi-profit">0</div>
-        <div class="kpi-sub" id="kpi-margin">Margin: 0%</div>
+        <div class="kpi-sub" id="kpi-margin">Маржа: 0%</div>
       </div>
     </section>
 
     <section class="grid-2">
       <div class="panel">
         <div class="panel-header">
-          <h3>Daily revenue & profit</h3>
+          <h3>Кунлик даромад ва фойда</h3>
         </div>
         <canvas id="dailyChart" height="120"></canvas>
       </div>
       <div class="panel">
         <div class="panel-header">
-          <h3>30-day forecast compare</h3>
-          <span class="muted" id="lastUpdated">Updated: -</span>
+          <h3>30 кунлик прогноз</h3>
+          <span class="muted" id="lastUpdated">Янгиланди: -</span>
         </div>
         <canvas id="forecastChart" height="120"></canvas>
       </div>
       <div class="panel">
         <div class="panel-header">
-          <h3>Cost breakdown</h3>
+          <h3>Харажатлар тақсимоти</h3>
         </div>
         <div class="breakdown">
-          <div><span>Fees (commission)</span><b id="kpi-fees">0</b></div>
-          <div><span>Acquiring</span><b id="kpi-acquiring">0</b></div>
-          <div><span>Logistics</span><b id="kpi-logistics">0</b></div>
-          <div><span>Returns</span><b id="kpi-returns">0</b></div>
-          <div><span>Expenses</span><b id="kpi-expenses-break">0</b></div>
+          <div><span>Комиссия</span><b id="kpi-fees">0</b></div>
+          <div><span>Эквайринг</span><b id="kpi-acquiring">0</b></div>
+          <div><span>Логистика</span><b id="kpi-logistics">0</b></div>
+          <div><span>Қайтариш</span><b id="kpi-returns">0</b></div>
+          <div><span>Харажат</span><b id="kpi-expenses-break">0</b></div>
           <div><span>COGS</span><b id="kpi-cogs">0</b></div>
         </div>
-        <div class="compare" id="compareText">Loading...</div>
+        <div class="compare" id="compareText">Юкланмоқда...</div>
       </div>
     </section>
 
     <section class="ai-section">
       <div class="panel ai">
         <div class="panel-header">
-          <h3>AI Insight</h3>
-          <span class="muted" id="aiStatus">Idle</span>
+          <h3>AI таҳлил</h3>
+          <span class="muted" id="aiStatus">Кутилмоқда</span>
         </div>
         <div class="ai-grid">
           <div class="ai-card" id="aiInsight">Waiting for AI...</div>
@@ -106,12 +106,15 @@
     <section class="table-section">
       <div class="panel">
         <div class="panel-header">
-          <h3>Products (SKU)</h3>
-          <span class="muted" id="productsCount">0 items</span>
+          <h3>Товарлар (SKU)</h3>
+          <div class="actions">
+            <button class="btn ghost" id="syncSkuBtn">SKUларни янгилаш</button>
+            <span class="muted" id="productsCount">0 та</span>
+          </div>
         </div>
         <div class="panel-header">
           <div>
-            <label class="muted" for="skuSelect">SKU chart</label>
+            <label class="muted" for="skuSelect">SKU график</label>
             <select id="skuSelect" class="btn ghost"></select>
           </div>
         </div>
@@ -121,17 +124,17 @@
             <thead>
               <tr>
                 <th>SKU</th>
-                <th>Name</th>
-                <th>Cost</th>
-                <th>Qty</th>
-                <th>Revenue</th>
-                <th>Fees</th>
-                <th>Acquiring</th>
-                <th>Logistics</th>
-                <th>Returns</th>
+                <th>Номи</th>
+                <th>Таннарх</th>
+                <th>Сон</th>
+                <th>Даромад</th>
+                <th>Комиссия</th>
+                <th>Эквайринг</th>
+                <th>Логистика</th>
+                <th>Қайтариш</th>
                 <th>COGS</th>
-                <th>Profit</th>
-                <th>Margin</th>
+                <th>Фойда</th>
+                <th>Маржа</th>
               </tr>
             </thead>
             <tbody id="productTable">
