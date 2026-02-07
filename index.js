@@ -46,25 +46,26 @@ const ADMIN_IDS = process.env.ADMIN_IDS
   ? process.env.ADMIN_IDS.split(',').map(String)
   : [];
 
-app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 app.get('/', (req, res) => res.redirect('/dashboard'));
 
-// Yandex API notifications (public webhook)
+// Yandex API notifications (public webhook) - accept any content-type
 const YANDEX_NOTIFY_SECRET = process.env.YANDEX_NOTIFY_SECRET;
+app.use('/yandex/notify', express.text({ type: '*/*' }));
 app.all('/yandex/notify/:secret?', async (req, res) => {
   const secret = req.params.secret || req.query.secret || req.headers['x-notify-secret'];
   if (YANDEX_NOTIFY_SECRET && String(secret) !== String(YANDEX_NOTIFY_SECRET)) {
     return res.status(401).send('Unauthorized');
   }
 
-  res.status(200).json({ ok: true });
+  res.status(200).send('OK');
 
   try {
-    // basic: notify admins + optional quick sync today
-    const msg = `Yandex notify: ${JSON.stringify(req.body || {})}`.slice(0, 3500);
+    const bodyText =
+      typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
+    const msg = `Yandex notify: ${bodyText}`.slice(0, 3500);
     if (!DISABLE_BOT && ADMIN_IDS.length) {
       for (const chatId of ADMIN_IDS) {
         // eslint-disable-next-line no-await-in-loop
@@ -75,6 +76,8 @@ app.all('/yandex/notify/:secret?', async (req, res) => {
     console.error('Yandex notify error:', e.message);
   }
 });
+
+app.use(express.json());
 
 // WEB
 const addWebRoutes = () => {
