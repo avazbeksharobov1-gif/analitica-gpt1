@@ -181,4 +181,15 @@ module.exports = (app) => {
       res.status(500).json({ ok: false, error: e.message });
     }
   });
+
+  app.get('/api/sync', async (req, res) => {
+    try {
+      const projectId = req.query.project ? Number(req.query.project) : 1;
+      const date = req.query.date ? new Date(req.query.date) : new Date();
+      const r = await syncDay(projectId, date);
+      res.json({ ok: true, data: r });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
 };

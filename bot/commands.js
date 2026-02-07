@@ -6,6 +6,7 @@
   addExpense
 } = require('../services/analytics');
 const { aiInsight, aiRecommend } = require('../services/ai');
+const { syncDay } = require('../services/ingest');
 const { prisma } = require('../services/db');
 
 const projectByChat = new Map();
@@ -53,6 +54,7 @@ function setupCommands(bot) {
         '/forecast - 30 day forecast\n' +
         '/insight - AI insight\n' +
         '/recommend - AI recommendations\n' +
+        '/sync [YYYY-MM-DD] - Sync seller data\n' +
         '/projects - Project list\n' +
         '/project <id> - Select project\n' +
         '/alerts on|off - Profit drop alerts\n' +
@@ -134,6 +136,21 @@ function setupCommands(bot) {
         `Today: ${today}\n` +
         `After 30 days: ${day30}`
     );
+  });
+
+  bot.command('sync', async (ctx) => {
+    try {
+      const projectId = getProjectId(ctx);
+      const parts = ctx.message.text.trim().split(/\s+/);
+      const date = parts[1] ? new Date(parts[1]) : new Date();
+      if (Number.isNaN(date.getTime())) {
+        return ctx.reply('Format: /sync 2026-02-07');
+      }
+      await syncDay(projectId, date);
+      ctx.reply(`Synced ${date.toISOString().slice(0, 10)}`);
+    } catch (e) {
+      ctx.reply('Sync failed');
+    }
   });
 
   bot.command('insight', async (ctx) => {
