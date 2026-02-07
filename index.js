@@ -66,6 +66,8 @@ app.listen(PORT, async () => {
 
   console.log('Server running on', PORT);
 
+  if (setupCron) setupCron();
+
   if (DISABLE_BOT) {
     console.warn('Bot disabled via DISABLE_BOT=true');
     return;
@@ -73,7 +75,6 @@ app.listen(PORT, async () => {
 
   setupAlerts(bot, ADMIN_IDS);
   setupBotCron(bot, ADMIN_IDS);
-  if (setupCron) setupCron(bot);
 
   try {
     console.log('Webhook mode:', WEBHOOK_URL ? 'ON' : 'OFF');

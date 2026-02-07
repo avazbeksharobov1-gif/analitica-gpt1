@@ -25,17 +25,19 @@ function setupCron() {
     return;
   }
 
+  const tz = process.env.CRON_TZ || 'Asia/Tashkent';
+
   // Hourly sync for today
   cron.schedule('15 * * * *', async () => {
     await syncForAllProjects(new Date());
-  });
+  }, { timezone: tz });
 
   // Daily sync for yesterday (finalize)
   cron.schedule('10 5 * * *', async () => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
     await syncForAllProjects(toDateOnly(d));
-  });
+  }, { timezone: tz });
 }
 
 module.exports = { setupCron };

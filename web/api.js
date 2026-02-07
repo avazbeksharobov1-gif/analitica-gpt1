@@ -1,4 +1,4 @@
-﻿const {
+const {
   getKpi,
   getCompareStats,
   getForecastCompare,
@@ -7,15 +7,25 @@
 const { aiInsight, aiRecommend, aiAnomalyDetect, aiProductProfit } = require('../services/ai');
 const { syncDay } = require('../services/ingest');
 const { prisma } = require('../services/db');
+const { exportExcel } = require('../exporter');
+const { generatePDF } = require('../services/report');
 
 module.exports = (app) => {
   const AI_DISABLED = process.env.DISABLE_AI === 'true';
+
+  function parseRange(req) {
+    const projectId = req.query.project ? Number(req.query.project) : 1;
+    const from = req.query.from ? new Date(req.query.from) : new Date();
+    const to = req.query.to ? new Date(req.query.to) : new Date();
+    return { projectId, from, to };
+  }
 
   function aiFail(res, label, err, debug) {
     const msg = err && err.message ? err.message : String(err || 'Unknown error');
     console.error(`AI ${label} error:`, msg);
     res.status(500).send(debug ? `AI ${label} error: ${msg}` : `AI ${label} not available`);
   }
+
   app.get('/api/stats', async (req, res) => {
     const projectId = req.query.project ? Number(req.query.project) : 1;
     const from = req.query.from ? new Date(req.query.from) : new Date();
@@ -26,6 +36,53 @@ module.exports = (app) => {
   app.get('/api/compare', async (req, res) => {
     const projectId = req.query.project ? Number(req.query.project) : 1;
     res.json(await getCompareStats(projectId));
+  });
+
+  app.get('/api/export/excel', async (req, res) => {
+    try {
+      const { projectId, from, to } = parseRange(req);
+      const [kpi, items, project] = await Promise.all([
+        getKpi(projectId, from, to),
+        getProductProfit(projectId, from, to),
+        prisma.project.findUnique({ where: { id: projectId } })
+      ]);
+
+      const file = await exportExcel({
+        kpi,
+        items,
+        range: { from, to },
+        projectName: project ? project.name : null
+      });
+
+      const name = `analitica-${projectId}-${from.toISOString().slice(0, 10)}-${to
+        .toISOString()
+        .slice(0, 10)}.xlsx`;
+      res.download(file, name);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.get('/api/export/pdf', async (req, res) => {
+    try {
+      const { projectId, from, to } = parseRange(req);
+      const [kpi, project] = await Promise.all([
+        getKpi(projectId, from, to),
+        prisma.project.findUnique({ where: { id: projectId } })
+      ]);
+
+      const file = await generatePDF(kpi, {
+        range: { from, to },
+        projectName: project ? project.name : null
+      });
+
+      const name = `analitica-${projectId}-${from.toISOString().slice(0, 10)}-${to
+        .toISOString()
+        .slice(0, 10)}.pdf`;
+      res.download(file, name);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
   });
 
   app.get('/api/forecast-compare', async (req, res) => {

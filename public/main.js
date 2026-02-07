@@ -1,4 +1,4 @@
-﻿let chart;
+let chart;
 let currentRange = '7d';
 
 function fmt(n) {
@@ -15,6 +15,17 @@ function rangeToDates(range) {
     to.setHours(23, 59, 59, 999);
   }
   return { from, to };
+}
+
+function updateExportLinks() {
+  const { from, to } = rangeToDates(currentRange);
+  const qs = `from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(
+    to.toISOString()
+  )}`;
+  const excel = document.getElementById('exportExcel');
+  const pdf = document.getElementById('exportPdf');
+  if (excel) excel.href = `/api/export/excel?${qs}`;
+  if (pdf) pdf.href = `/api/export/pdf?${qs}`;
 }
 
 async function loadKpi(range) {
@@ -146,6 +157,7 @@ async function loadAI() {
 async function loadAll() {
   await Promise.all([loadKpi(currentRange), loadCompare(), loadForecast(), loadProducts(currentRange)]);
   document.getElementById('lastUpdated').innerText = `Updated: ${new Date().toLocaleString()}`;
+  updateExportLinks();
 }
 
 function setupRangeButtons() {
