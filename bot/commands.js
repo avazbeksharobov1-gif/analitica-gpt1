@@ -14,6 +14,9 @@ const QuickChart = require('quickchart-js');
 const { Markup } = require('telegraf');
 
 const AI_DISABLED = process.env.DISABLE_AI === 'true';
+const BASE_URL =
+  process.env.WEBHOOK_URL ||
+  (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '');
 
 const projectByChat = new Map();
 const expenseFlow = new Map();
@@ -66,12 +69,29 @@ async function showExpenseCategories(ctx) {
   await ctx.reply('Kategoriya tanlang', Markup.keyboard(rows).oneTime().resize());
 }
 
+async function startExpenseFlow(ctx) {
+  const chatId = String(ctx.chat.id);
+  expenseFlow.set(chatId, { step: 'category', projectId: getProjectId(ctx) });
+  await showExpenseCategories(ctx);
+}
+
+async function sendDashboard(ctx) {
+  if (!BASE_URL) {
+    return ctx.reply('Dashboard URL topilmadi. Railway domainni tekshiring.');
+  }
+  return ctx.reply(
+    'Dashboard:',
+    Markup.inlineKeyboard([Markup.button.url('Dashboard', `${BASE_URL}/dashboard`)])
+  );
+}
+
 function setupCommands(bot) {
   bot.start(async (ctx) => {
     const p = await getOrCreateProject();
     projectByChat.set(String(ctx.chat.id), p.id);
     ctx.reply(
       'Analitica Bot\n\n' +
+        '/dashboard - Dashboard link\n' +
         '/stats - Daily KPI\n' +
         '/month - 30 day KPI\n' +
         '/compare - Week compare\n' +
@@ -84,8 +104,25 @@ function setupCommands(bot) {
         '/projects - Project list\n' +
         '/project <id> - Select project\n' +
         '/alerts on|off - Profit drop alerts\n' +
-        'Expense format: expense svet 150000'
+        '/cancel - bekor qilish\n' +
+        'Expense format: expense svet 150000',
+      Markup.keyboard([
+        ['📊 Dashboard', '💸 Xarajat'],
+        ['📄 Report']
+      ]).resize()
     );
+  });
+
+  bot.command('dashboard', sendDashboard);
+  bot.hears(/dashboard|dash|panel|панел|дашборд|📊/i, sendDashboard);
+  bot.hears(/^(💸\s*)?(xarajat|harajat)$/i, startExpenseFlow);
+
+  bot.command(['harajat', 'xarajat'], startExpenseFlow);
+
+  bot.command('cancel', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    expenseFlow.delete(chatId);
+    ctx.reply('Bekor qilindi', Markup.removeKeyboard());
   });
 
   bot.command('project', async (ctx) => {
@@ -93,9 +130,9 @@ function setupCommands(bot) {
     const id = Number(parts[1]);
     if (!id) return ctx.reply('Format: /project 1');
     const p = await prisma.project.findUnique({ where: { id } });
-    if (!p) return ctx.reply('Project not found');
+    if (!p) return ctx.reply('Project topilmadi');
     projectByChat.set(String(ctx.chat.id), p.id);
-    ctx.reply(`Selected: ${p.name}`);
+    ctx.reply(`Tanlandi: ${p.name}`);
   });
 
   bot.command('stats', async (ctx) => {
@@ -103,16 +140,16 @@ function setupCommands(bot) {
     const today = new Date();
     const s = await getKpi(projectId, today, today);
     ctx.reply(
-      `Daily KPI\n\n` +
-        `Revenue: ${s.revenue}\n` +
-        `Orders: ${s.orders}\n` +
-        `Fees (commission): ${s.fees}\n` +
-        `Acquiring: ${s.acquiring}\n` +
-        `Logistics: ${s.logistics}\n` +
-        `Returns: ${s.returns}\n` +
-        `Expenses: ${s.expenses}\n` +
+      `Kunlik KPI\n\n` +
+        `Daromad: ${s.revenue}\n` +
+        `Buyurtmalar: ${s.orders}\n` +
+        `Komissiya: ${s.fees}\n` +
+        `Ekvayring: ${s.acquiring}\n` +
+        `Logistika: ${s.logistics}\n` +
+        `Qaytarish: ${s.returns}\n` +
+        `Xarajat: ${s.expenses}\n` +
         `COGS: ${s.cogs}\n` +
-        `Profit: ${s.profit}`
+        `Foyda: ${s.profit}`
     );
   });
 
@@ -123,16 +160,16 @@ function setupCommands(bot) {
     from.setDate(from.getDate() - 29);
     const s = await getKpi(projectId, from, to);
     ctx.reply(
-      `30-day KPI\n\n` +
-        `Revenue: ${s.revenue}\n` +
-        `Orders: ${s.orders}\n` +
-        `Fees (commission): ${s.fees}\n` +
-        `Acquiring: ${s.acquiring}\n` +
-        `Logistics: ${s.logistics}\n` +
-        `Returns: ${s.returns}\n` +
-        `Expenses: ${s.expenses}\n` +
+      `30 kunlik KPI\n\n` +
+        `Daromad: ${s.revenue}\n` +
+        `Buyurtmalar: ${s.orders}\n` +
+        `Komissiya: ${s.fees}\n` +
+        `Ekvayring: ${s.acquiring}\n` +
+        `Logistika: ${s.logistics}\n` +
+        `Qaytarish: ${s.returns}\n` +
+        `Xarajat: ${s.expenses}\n` +
         `COGS: ${s.cogs}\n` +
-        `Profit: ${s.profit}`
+        `Foyda: ${s.profit}`
     );
   });
 
@@ -142,13 +179,13 @@ function setupCommands(bot) {
     const diff = lastWeek.revenue ? ((thisWeek.revenue - lastWeek.revenue) / lastWeek.revenue) * 100 : 0;
     const profitDiff = lastWeek.profit ? ((thisWeek.profit - lastWeek.profit) / lastWeek.profit) * 100 : 0;
     ctx.reply(
-      `Week compare\n\n` +
-        `Revenue this week: ${thisWeek.revenue}\n` +
-        `Revenue last week: ${lastWeek.revenue}\n` +
-        `Revenue change: ${diff.toFixed(1)}%\n\n` +
-        `Profit this week: ${thisWeek.profit}\n` +
-        `Profit last week: ${lastWeek.profit}\n` +
-        `Profit change: ${profitDiff.toFixed(1)}%`
+      `Hafta taqqoslash\n\n` +
+        `Daromad (shu hafta): ${thisWeek.revenue}\n` +
+        `Daromad (otgan hafta): ${lastWeek.revenue}\n` +
+        `Ozgarish: ${diff.toFixed(1)}%\n\n` +
+        `Foyda (shu hafta): ${thisWeek.profit}\n` +
+        `Foyda (otgan hafta): ${lastWeek.profit}\n` +
+        `Ozgarish: ${profitDiff.toFixed(1)}%`
     );
   });
 
@@ -158,22 +195,10 @@ function setupCommands(bot) {
     const today = f.current[0] ?? 0;
     const day30 = f.current[f.current.length - 1] ?? 0;
     ctx.reply(
-      `30-day forecast\n\n` +
-        `Today: ${today}\n` +
-        `After 30 days: ${day30}`
+      `30 kunlik prognoz\n\n` +
+        `Bugun: ${today}\n` +
+        `30 kundan keyin: ${day30}`
     );
-  });
-
-  bot.command(['harajat', 'xarajat'], async (ctx) => {
-    const chatId = String(ctx.chat.id);
-    expenseFlow.set(chatId, { step: 'category', projectId: getProjectId(ctx) });
-    await showExpenseCategories(ctx);
-  });
-
-  bot.command('cancel', async (ctx) => {
-    const chatId = String(ctx.chat.id);
-    expenseFlow.delete(chatId);
-    ctx.reply('Bekor qilindi', Markup.removeKeyboard());
   });
 
   bot.command('report', async (ctx) => {
