@@ -1,6 +1,7 @@
 const { prisma } = require('./db');
 const { fetchOrdersByDate, fetchReturnsByDate, fetchPayoutsByDate } = require('./yandexSeller');
 const ACQUIRING_RATE = Number(process.env.ACQUIRING_RATE || 0.01);
+const SKIP_PAYOUTS = process.env.SKIP_PAYOUTS === 'true';
 
 function toDateOnly(d) {
   const dt = new Date(d);
@@ -43,11 +44,18 @@ async function syncDay(projectId, date) {
       console.error('Yandex returns error:', e.message);
       return { returns: [] };
     }),
-    fetchPayoutsByDate(dateStr, dateStr).catch((e) => {
-      errors.payouts = e.message || String(e);
-      console.error('Yandex payouts error:', e.message);
-      return { payouts: [] };
-    })
+    SKIP_PAYOUTS
+      ? Promise.resolve({ payouts: [] })
+      : fetchPayoutsByDate(dateStr, dateStr).catch((e) => {
+          const msg = e.message || String(e);
+          if (!msg.includes('404') && !msg.includes('NOT_FOUND')) {
+            errors.payouts = msg;
+            console.error('Yandex payouts error:', msg);
+          } else {
+            console.warn('Yandex payouts not available, skipping');
+          }
+          return { payouts: [] };
+        })
   ]);
 
   const orders = ordersData.orders || [];
@@ -75,7 +83,8 @@ async function syncDay(projectId, date) {
 
   for (const o of orders) {
     ordersCount += 1;
-    const orderRevenue = Number(o.total) || Number(o.itemsTotal) || 0;
+    let orderRevenue =
+      pickNumber(o, ['total', 'itemsTotal', 'buyerItemsTotal', 'paymentsTotal', 'price']) || 0;
     const orderFees = pickNumber(o, ['fee', 'fees', 'marketplaceFee', 'commission']);
     const orderLogistics = pickNumber(o, ['delivery', 'logistics', 'shipping', 'shipment']);
     let orderAcquiring = pickNumber(o, [
@@ -89,6 +98,14 @@ async function syncDay(projectId, date) {
 
     if (!orderAcquiring && ACQUIRING_RATE > 0) {
       orderAcquiring = orderRevenue * ACQUIRING_RATE;
+    }
+
+    if ((!orderRevenue || orderRevenue === 0) && Array.isArray(o.items)) {
+      orderRevenue = o.items.reduce((sum, it) => {
+        const qty = Number(it.count || it.quantity || 0);
+        const price = Number(it.price || it.priceWithDiscount || 0);
+        return sum + price * qty;
+      }, 0);
     }
 
     revenue += orderRevenue;
