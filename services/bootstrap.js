@@ -1,13 +1,13 @@
 const { prisma } = require('./db');
 
 const DEFAULT_CATEGORIES = [
-  { code: 'svet', name: 'Свет' },
-  { code: 'gaz', name: 'Газ' },
-  { code: 'suv', name: 'Сув' },
-  { code: 'ozik', name: 'Ози?-ов?ат' },
-  { code: 'moshina', name: 'Мошина' },
-  { code: 'soliq', name: 'Соли?' },
-  { code: 'kvartp', name: 'Квартплата' }
+  { code: 'svet', name: 'РЎРІРµС‚' },
+  { code: 'gaz', name: 'Р“Р°Р·' },
+  { code: 'suv', name: 'РЎСѓРІ' },
+  { code: 'ozik', name: 'РћР·РёТ›-РѕРІТ›Р°С‚' },
+  { code: 'moshina', name: 'РњРѕС€РёРЅР°' },
+  { code: 'soliq', name: 'РЎРѕР»РёТ›' },
+  { code: 'kvartp', name: 'РљРІР°СЂС‚РїР»Р°С‚Р°' }
 ];
 
 async function ensureCategories() {
