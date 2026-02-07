@@ -24,6 +24,7 @@ const WEBHOOK_URL =
   (process.env.RAILWAY_PUBLIC_DOMAIN
     ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
     : '');
+const DISABLE_BOT = process.env.DISABLE_BOT === 'true';
 const IS_RAILWAY = Boolean(
   process.env.RAILWAY_PUBLIC_DOMAIN ||
     process.env.RAILWAY_PROJECT_ID ||
@@ -50,6 +51,7 @@ addWebRoutes();
 
 // TELEGRAM WEBHOOK
 app.post('/telegram', (req, res) => {
+  if (DISABLE_BOT) return res.status(200).send('Bot disabled');
   bot.handleUpdate(req.body, res);
 });
 
@@ -63,6 +65,11 @@ app.listen(PORT, async () => {
   }
 
   console.log('Server running on', PORT);
+
+  if (DISABLE_BOT) {
+    console.warn('Bot disabled via DISABLE_BOT=true');
+    return;
+  }
 
   setupAlerts(bot, ADMIN_IDS);
   setupBotCron(bot, ADMIN_IDS);
