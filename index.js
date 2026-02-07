@@ -75,15 +75,19 @@ app.listen(PORT, async () => {
   setupBotCron(bot, ADMIN_IDS);
   if (setupCron) setupCron(bot);
 
-  console.log('Webhook mode:', WEBHOOK_URL ? 'ON' : 'OFF');
-  if (WEBHOOK_URL) {
-    await bot.telegram.setWebhook(`${WEBHOOK_URL}/telegram`);
-    console.log('Webhook connected');
-  } else if (IS_RAILWAY && !ENABLE_POLLING) {
-    console.warn('Polling disabled on Railway (set WEBHOOK_URL or ENABLE_POLLING=true).');
-  } else {
-    await bot.telegram.deleteWebhook();
-    await bot.launch();
-    console.log('Bot launched (long polling)');
+  try {
+    console.log('Webhook mode:', WEBHOOK_URL ? 'ON' : 'OFF');
+    if (WEBHOOK_URL) {
+      await bot.telegram.setWebhook(`${WEBHOOK_URL}/telegram`);
+      console.log('Webhook connected');
+    } else if (IS_RAILWAY && !ENABLE_POLLING) {
+      console.warn('Polling disabled on Railway (set WEBHOOK_URL or ENABLE_POLLING=true).');
+    } else {
+      await bot.telegram.deleteWebhook();
+      await bot.launch();
+      console.log('Bot launched (long polling)');
+    }
+  } catch (e) {
+    console.error('Bot init failed:', e.message);
   }
 });
