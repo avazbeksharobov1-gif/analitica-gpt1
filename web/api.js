@@ -9,6 +9,11 @@ const { syncDay } = require('../services/ingest');
 const { prisma } = require('../services/db');
 
 module.exports = (app) => {
+  function aiFail(res, label, err, debug) {
+    const msg = err && err.message ? err.message : String(err || 'Unknown error');
+    console.error(`AI ${label} error:`, msg);
+    res.status(500).send(debug ? `AI ${label} error: ${msg}` : `AI ${label} not available`);
+  }
   app.get('/api/stats', async (req, res) => {
     const projectId = req.query.project ? Number(req.query.project) : 1;
     const from = req.query.from ? new Date(req.query.from) : new Date();
@@ -33,7 +38,7 @@ module.exports = (app) => {
       const text = await aiInsight(lastWeek.revenue, thisWeek.revenue);
       res.send(text);
     } catch (e) {
-      res.status(500).send('AI insight not available');
+      aiFail(res, 'insight', e, req.query.debug === '1');
     }
   });
 
@@ -44,7 +49,7 @@ module.exports = (app) => {
       const text = await aiRecommend(await getKpi(projectId, today, today));
       res.send(text);
     } catch (e) {
-      res.status(500).send('AI recommendation not available');
+      aiFail(res, 'recommendation', e, req.query.debug === '1');
     }
   });
 
@@ -65,7 +70,7 @@ module.exports = (app) => {
       const text = await aiAnomalyDetect(series);
       res.send(text);
     } catch (e) {
-      res.status(500).send('AI anomaly not available');
+      aiFail(res, 'anomaly', e, req.query.debug === '1');
     }
   });
 
@@ -78,7 +83,7 @@ module.exports = (app) => {
       const text = await aiProductProfit(items);
       res.send(text);
     } catch (e) {
-      res.status(500).send('AI product insight not available');
+      aiFail(res, 'product', e, req.query.debug === '1');
     }
   });
 
