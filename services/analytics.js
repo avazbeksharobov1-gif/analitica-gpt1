@@ -1,6 +1,15 @@
 const { prisma } = require('./db');
 const { forecast30DaysCompare } = require('./forecast');
 
+function parseEnvNumber(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const n = Number(String(value).replace(',', '.'));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+const TAX_RATE = parseEnvNumber(process.env.TAX_RATE, 0.01);
+const SOCIAL_TAX_MONTHLY = parseEnvNumber(process.env.SOCIAL_TAX_MONTHLY, 0);
+
 function toDateOnly(d) {
   const dt = new Date(d);
   dt.setHours(0, 0, 0, 0);
@@ -21,6 +30,25 @@ function addDays(d, n) {
   const x = new Date(d);
   x.setDate(x.getDate() + n);
   return x;
+}
+
+function isValidNumber(n) {
+  return Number.isFinite(n) && !Number.isNaN(n);
+}
+
+function socialTaxForRange(from, to) {
+  if (!isValidNumber(SOCIAL_TAX_MONTHLY) || SOCIAL_TAX_MONTHLY <= 0) return 0;
+  const { start, end } = rangeDates(from, to);
+  let total = 0;
+  let cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  cursor.setHours(0, 0, 0, 0);
+
+  while (cursor <= end) {
+    if (cursor >= start && cursor <= end) total += SOCIAL_TAX_MONTHLY;
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+  }
+
+  return total;
 }
 
 async function sumExpenses(projectId, from, to) {
@@ -76,6 +104,9 @@ async function getKpi(projectId, from, to) {
     cogsByItems(projectId, from, to)
   ]);
 
+  const tax1 = isValidNumber(TAX_RATE) && TAX_RATE > 0 ? sales.revenue * TAX_RATE : 0;
+  const socialTax = socialTaxForRange(from, to);
+
   const profit =
     sales.revenue -
     expenses -
@@ -83,7 +114,9 @@ async function getKpi(projectId, from, to) {
     sales.acquiring -
     sales.logistics -
     sales.returns -
-    cogs;
+    cogs -
+    tax1 -
+    socialTax;
 
   return {
     revenue: sales.revenue,
@@ -93,6 +126,8 @@ async function getKpi(projectId, from, to) {
     logistics: sales.logistics,
     returns: sales.returns,
     expenses,
+    tax1,
+    socialTax,
     cogs,
     profit
   };
@@ -235,7 +270,9 @@ async function getDailySeries(projectId, from, to) {
       logistics: r.logistics || 0,
       returns: r.returns || 0,
       expenses: 0,
-      cogs: 0
+      cogs: 0,
+      tax1: 0,
+      socialTax: 0
     });
   }
 
@@ -249,7 +286,9 @@ async function getDailySeries(projectId, from, to) {
       logistics: 0,
       returns: 0,
       expenses: 0,
-      cogs: 0
+      cogs: 0,
+      tax1: 0,
+      socialTax: 0
     };
     row.expenses += e.amount || 0;
     dailyMap.set(key, row);
@@ -265,7 +304,9 @@ async function getDailySeries(projectId, from, to) {
       logistics: 0,
       returns: 0,
       expenses: 0,
-      cogs: 0
+      cogs: 0,
+      tax1: 0,
+      socialTax: 0
     };
     const cost = costMap.get(it.sku) || 0;
     row.cogs += (it.quantity || 0) * cost;
@@ -283,8 +324,18 @@ async function getDailySeries(projectId, from, to) {
       logistics: 0,
       returns: 0,
       expenses: 0,
-      cogs: 0
+      cogs: 0,
+      tax1: 0,
+      socialTax: 0
     };
+    const tax1 = isValidNumber(TAX_RATE) && TAX_RATE > 0 ? row.revenue * TAX_RATE : 0;
+    const isFirstDay = d.getDate() === 1;
+    const socialTax =
+      isFirstDay && isValidNumber(SOCIAL_TAX_MONTHLY) && SOCIAL_TAX_MONTHLY > 0
+        ? SOCIAL_TAX_MONTHLY
+        : 0;
+    row.tax1 = tax1;
+    row.socialTax = socialTax;
     const profit =
       row.revenue -
       row.fees -
@@ -292,7 +343,9 @@ async function getDailySeries(projectId, from, to) {
       row.logistics -
       row.returns -
       row.expenses -
-      row.cogs;
+      row.cogs -
+      row.tax1 -
+      row.socialTax;
     result.push({
       date: key,
       ...row,

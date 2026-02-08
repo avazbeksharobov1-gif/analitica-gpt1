@@ -7,7 +7,14 @@ const {
   getApiKeys
 } = require('./yandexSeller');
 const { getSellerConfig } = require('./projectTokens');
-const ACQUIRING_RATE = Number(process.env.ACQUIRING_RATE || 0.01);
+
+function parseEnvNumber(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const n = Number(String(value).replace(',', '.'));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+const ACQUIRING_RATE = parseEnvNumber(process.env.ACQUIRING_RATE, 0.01);
 const SKIP_PAYOUTS = process.env.SKIP_PAYOUTS === 'true';
 
 function toDateOnly(d) {
