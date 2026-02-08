@@ -109,7 +109,8 @@ async function syncDay(projectId, date) {
     baseUrl: config?.baseUrl,
     authMode: config?.authMode
   };
-  if (!campaignIds.length) {
+  const hasTokenMapCampaigns = tokenMap.some((t) => t.campaignIds && t.campaignIds.length);
+  if (!campaignIds.length && !hasTokenMapCampaigns) {
     throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
   }
   if (!apiKeys.length) {

@@ -15,7 +15,10 @@ async function syncCatalog(projectId) {
     baseUrl: config?.baseUrl,
     authMode: config?.authMode
   };
-  if (!campaignIds.length) throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
+  const hasTokenMapCampaigns = tokenMap.some((t) => t.campaignIds && t.campaignIds.length);
+  if (!campaignIds.length && !hasTokenMapCampaigns) {
+    throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
+  }
   if (!apiKeys.length) throw new Error('YANDEX_SELLER_API_KEY missing');
 
   const skuMap = new Map();
