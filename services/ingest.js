@@ -30,6 +30,67 @@ function pickNumber(obj, keys) {
   return 0;
 }
 
+function sumCommissions(list) {
+  const out = { fees: 0, acquiring: 0, logistics: 0 };
+  if (!Array.isArray(list)) return out;
+
+  for (const c of list) {
+    const type = String(c?.type || c?.service || c?.name || '').toUpperCase();
+    const amount =
+      Number(c?.actual) ||
+      Number(c?.amount) ||
+      Number(c?.value) ||
+      0;
+    if (!amount) continue;
+
+    if (['FEE', 'LOYALTY_PARTICIPATION_FEE', 'AUCTION_PROMOTION', 'INSTALLMENT'].includes(type)) {
+      out.fees += amount;
+      continue;
+    }
+    if (['AGENCY', 'AGENCY_COMMISSION', 'PAYMENT_TRANSFER'].includes(type)) {
+      out.acquiring += amount;
+      continue;
+    }
+    if (
+      [
+        'DELIVERY_TO_CUSTOMER',
+        'EXPRESS_DELIVERY_TO_CUSTOMER',
+        'RETURNED_ORDERS_STORAGE',
+        'SORTING',
+        'INTAKE_SORTING',
+        'RETURN_PROCESSING',
+        'FULFILLMENT',
+        'MIDDLE_MILE',
+        'CROSSREGIONAL_DELIVERY',
+        'DELIVERY',
+        'EXPRESS_DELIVERY',
+        'LOGISTICS'
+      ].includes(type)
+    ) {
+      out.logistics += amount;
+      continue;
+    }
+
+    // Unknown commission type -> keep under fees to not lose costs
+    out.fees += amount;
+  }
+
+  return out;
+}
+
+function getItemRevenue(it) {
+  const qty = Number(it.count || it.quantity || 0) || 0;
+  if (Array.isArray(it.prices) && it.prices.length) {
+    const buyer = it.prices.find((p) => String(p.type).toUpperCase() === 'BUYER') || it.prices[0];
+    const total = Number(buyer?.total) || 0;
+    if (total) return total;
+    const per = Number(buyer?.costPerItem || buyer?.price) || 0;
+    return per * qty;
+  }
+  const price = Number(it.price || it.priceWithDiscount || it.buyerPrice || 0);
+  return price * qty;
+}
+
 function sumByKeys(items, keys) {
   return items.reduce((sum, it) => sum + pickNumber(it, keys), 0);
 }
@@ -130,9 +191,21 @@ async function syncDay(projectId, date) {
   for (const o of orders) {
     ordersCount += 1;
     let orderRevenue =
-      pickNumber(o, ['total', 'itemsTotal', 'buyerItemsTotal', 'paymentsTotal', 'price']) || 0;
-    const orderFees = pickNumber(o, ['fee', 'fees', 'marketplaceFee', 'commission']);
-    const orderLogistics = pickNumber(o, ['delivery', 'logistics', 'shipping', 'shipment']);
+      pickNumber(o, [
+        'total',
+        'itemsTotal',
+        'buyerItemsTotal',
+        'paymentsTotal',
+        'price',
+        'buyerTotal'
+      ]) || 0;
+
+    const commissionSplit = sumCommissions(o.commissions);
+    const hasCommissions =
+      commissionSplit.fees + commissionSplit.acquiring + commissionSplit.logistics > 0;
+
+    let orderFees = pickNumber(o, ['fee', 'fees', 'marketplaceFee', 'commission']);
+    let orderLogistics = pickNumber(o, ['delivery', 'logistics', 'shipping', 'shipment']);
     let orderAcquiring = pickNumber(o, [
       'acquiring',
       'acquiringFee',
@@ -142,16 +215,18 @@ async function syncDay(projectId, date) {
       'processingFee'
     ]);
 
+    if (hasCommissions) {
+      orderFees = commissionSplit.fees;
+      orderLogistics = commissionSplit.logistics;
+      orderAcquiring = commissionSplit.acquiring;
+    }
+
     if (!orderAcquiring && ACQUIRING_RATE > 0) {
       orderAcquiring = orderRevenue * ACQUIRING_RATE;
     }
 
     if ((!orderRevenue || orderRevenue === 0) && Array.isArray(o.items)) {
-      orderRevenue = o.items.reduce((sum, it) => {
-        const qty = Number(it.count || it.quantity || 0);
-        const price = Number(it.price || it.priceWithDiscount || 0);
-        return sum + price * qty;
-      }, 0);
+      orderRevenue = o.items.reduce((sum, it) => sum + getItemRevenue(it), 0);
     }
 
     revenue += orderRevenue;
@@ -160,7 +235,7 @@ async function syncDay(projectId, date) {
     acquiring += orderAcquiring;
     if (Array.isArray(o.items)) {
       for (const it of o.items) {
-        const sku = String(it.offerId || it.sku || 'unknown');
+        const sku = String(it.offerId || it.shopSku || it.sku || 'unknown');
         const prev = itemAgg.get(sku) || {
           quantity: 0,
           revenue: 0,
@@ -169,14 +244,13 @@ async function syncDay(projectId, date) {
           logistics: 0,
           returns: 0
         };
-        const qty = Number(it.count) || 0;
-        const price = Number(it.price) || 0;
-        const itemRevenue = price * qty;
+        const qty = Number(it.count || it.quantity || 0) || 0;
+        const itemRevenue = getItemRevenue(it);
         prev.quantity += qty;
         prev.revenue += itemRevenue;
 
-        const itemFees = pickNumber(it, ['fee', 'fees', 'commission']);
-        const itemLogistics = pickNumber(it, ['delivery', 'logistics']);
+        const itemFees = pickNumber(it, ['fee', 'fees', 'commission', 'marketplaceFee']);
+        const itemLogistics = pickNumber(it, ['delivery', 'logistics', 'shipping']);
         const itemAcquiring = pickNumber(it, [
           'acquiring',
           'acquiringFee',
