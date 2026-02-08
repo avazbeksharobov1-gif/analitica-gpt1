@@ -3,10 +3,11 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 async function aiInsight(prev, curr) {
   const prompt = `
-Previous revenue: ${prev.revenue}
-Current revenue: ${curr.revenue}
+Oldingi daromad: ${prev.revenue}
+Hozirgi daromad: ${curr.revenue}
 
-Explain why revenue dropped and give advice.
+Daromad pasayishiga sabablarni va qisqa tavsiyalarni yozing.
+Javobni ozbek tilida (lotin) yozing.
 `;
 
   const r = await openai.chat.completions.create({

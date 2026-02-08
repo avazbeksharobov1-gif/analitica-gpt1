@@ -39,16 +39,19 @@ module.exports = function setupCron(bot, ADMIN_IDS = []) {
       if (!targets.length) continue;
 
       const msg =
-        `Daily report (${label})\nProject: ${p.name}\n\n` +
-        `Revenue: ${s.revenue}\n` +
-        `Orders: ${s.orders}\n` +
-        `Fees: ${s.fees}\n` +
-        `Acquiring: ${s.acquiring}\n` +
-        `Logistics: ${s.logistics}\n` +
-        `Returns: ${s.returns}\n` +
-        `Expenses: ${s.expenses}\n` +
+        `Kunlik hisobot (${label})\nLoyiha: ${p.name}\n\n` +
+        `Daromad: ${s.revenue}\n` +
+        `Buyurtmalar: ${s.orders}\n` +
+        `Yangi buyurtmalar: ${s.ordersCreated || 0}\n` +
+        `Omborga topshirilgan: ${s.ordersWarehouse || 0}\n` +
+        `Yetkazilgan: ${s.ordersDelivered || 0}\n` +
+        `Komissiya: ${s.fees}\n` +
+        `Ekvayring: ${s.acquiring}\n` +
+        `Logistika: ${s.logistics}\n` +
+        `Qaytarish: ${s.returns}\n` +
+        `Xarajat: ${s.expenses}\n` +
         `COGS: ${s.cogs}\n` +
-        `Profit: ${s.profit}`;
+        `Foyda: ${s.profit}`;
 
       for (const id of targets) {
         await bot.telegram.sendMessage(id, msg);

@@ -69,12 +69,25 @@ async function sumDaily(projectId, from, to) {
     (a, b) => ({
       revenue: a.revenue + b.revenue,
       orders: a.orders + b.orders,
+      ordersCreated: a.ordersCreated + (b.ordersCreated || 0),
+      ordersWarehouse: a.ordersWarehouse + (b.ordersWarehouse || 0),
+      ordersDelivered: a.ordersDelivered + (b.ordersDelivered || 0),
       fees: a.fees + b.fees,
       acquiring: a.acquiring + b.acquiring,
       logistics: a.logistics + b.logistics,
       returns: a.returns + b.returns
     }),
-    { revenue: 0, orders: 0, fees: 0, acquiring: 0, logistics: 0, returns: 0 }
+    {
+      revenue: 0,
+      orders: 0,
+      ordersCreated: 0,
+      ordersWarehouse: 0,
+      ordersDelivered: 0,
+      fees: 0,
+      acquiring: 0,
+      logistics: 0,
+      returns: 0
+    }
   );
 }
 
@@ -121,6 +134,9 @@ async function getKpi(projectId, from, to) {
   return {
     revenue: sales.revenue,
     orders: sales.orders,
+    ordersCreated: sales.ordersCreated || 0,
+    ordersWarehouse: sales.ordersWarehouse || 0,
+    ordersDelivered: sales.ordersDelivered || 0,
     fees: sales.fees,
     acquiring: sales.acquiring,
     logistics: sales.logistics,
@@ -265,6 +281,9 @@ async function getDailySeries(projectId, from, to) {
     dailyMap.set(dateKey(r.date), {
       revenue: r.revenue || 0,
       orders: r.orders || 0,
+      ordersCreated: r.ordersCreated || 0,
+      ordersWarehouse: r.ordersWarehouse || 0,
+      ordersDelivered: r.ordersDelivered || 0,
       fees: r.fees || 0,
       acquiring: r.acquiring || 0,
       logistics: r.logistics || 0,
@@ -281,6 +300,9 @@ async function getDailySeries(projectId, from, to) {
     const row = dailyMap.get(key) || {
       revenue: 0,
       orders: 0,
+      ordersCreated: 0,
+      ordersWarehouse: 0,
+      ordersDelivered: 0,
       fees: 0,
       acquiring: 0,
       logistics: 0,
@@ -299,6 +321,9 @@ async function getDailySeries(projectId, from, to) {
     const row = dailyMap.get(key) || {
       revenue: 0,
       orders: 0,
+      ordersCreated: 0,
+      ordersWarehouse: 0,
+      ordersDelivered: 0,
       fees: 0,
       acquiring: 0,
       logistics: 0,
@@ -319,6 +344,9 @@ async function getDailySeries(projectId, from, to) {
     const row = dailyMap.get(key) || {
       revenue: 0,
       orders: 0,
+      ordersCreated: 0,
+      ordersWarehouse: 0,
+      ordersDelivered: 0,
       fees: 0,
       acquiring: 0,
       logistics: 0,

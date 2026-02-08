@@ -5,12 +5,11 @@ const openai = new OpenAI({
 
 async function aiInsight(prev, curr) {
   const prompt = `
-Previous revenue: ${prev}
-Current revenue: ${curr}
+Oldingi daromad: ${prev}
+Hozirgi daromad: ${curr}
 
-Explain why revenue dropped.
-Give 3 short reasons and 2 actions.
-Answer in Uzbek (Cyrillic) and Russian.
+Daromad pasayishiga 3 ta qisqa sabab va 2 ta amaliy tavsiya yozing.
+Javobni ozbek tilida (lotin) yozing.
 `;
 
   const r = await openai.chat.completions.create({
@@ -23,22 +22,21 @@ Answer in Uzbek (Cyrillic) and Russian.
 
 async function aiRecommend(stats) {
   const prompt = `
-Revenue: ${stats.revenue}
-Orders: ${stats.orders}
-Fees: ${stats.fees}
-Acquiring: ${stats.acquiring}
-Logistics: ${stats.logistics}
-Returns: ${stats.returns}
-Expenses: ${stats.expenses}
+Daromad: ${stats.revenue}
+Buyurtmalar: ${stats.orders}
+Komissiya: ${stats.fees}
+Ekvayring: ${stats.acquiring}
+Logistika: ${stats.logistics}
+Qaytarish: ${stats.returns}
+Xarajat: ${stats.expenses}
 COGS: ${stats.cogs}
-Profit: ${stats.profit}
+Foyda: ${stats.profit}
 
-Give:
-1) Marketing recommendations
-2) Pricing recommendations
-3) Quick improvements
-Short bullet points.
-Answer in Uzbek (Cyrillic) and Russian.
+Quyidagilar bo'yicha qisqa tavsiyalar bering:
+1) Marketing
+2) Narx
+3) Tezkor yaxshilashlar
+Javobni ozbek tilida (lotin) yozing.
 `;
 
   const r = await openai.chat.completions.create({
@@ -51,10 +49,10 @@ Answer in Uzbek (Cyrillic) and Russian.
 
 async function aiAnomalyDetect(series) {
   const prompt = `
-Series: ${JSON.stringify(series)}
+Seriya: ${JSON.stringify(series)}
 
-Detect anomalies. Return short bullet points with dates/indexes and reason.
-Answer in Uzbek (Cyrillic) and Russian.
+Anomaliyalarni toping. Sana/indeks va sababini qisqa punktlar bilan yozing.
+Javobni ozbek tilida (lotin) yozing.
 `;
 
   const r = await openai.chat.completions.create({
@@ -67,11 +65,11 @@ Answer in Uzbek (Cyrillic) and Russian.
 
 async function aiProductProfit(items) {
   const prompt = `
-Product profit list (JSON): ${JSON.stringify(items)}
+Mahsulot foydasi (JSON): ${JSON.stringify(items)}
 
-Analyze which products are profitable and which are loss-making.
-Give 3-5 key insights and actions.
-Answer in Uzbek (Cyrillic) and Russian.
+Qaysi mahsulotlar foydali, qaysilari zarar ekanini tahlil qiling.
+3-5 ta asosiy xulosa va amaliy tavsiya bering.
+Javobni ozbek tilida (lotin) yozing.
 `;
 
   const r = await openai.chat.completions.create({

@@ -79,12 +79,51 @@ function extractItemReturnAmount(it) {
   return readMoney(it.totalAmount) || readMoney(it.price) || 0;
 }
 
+function classifyCharge(type) {
+  const t = String(type || '').toUpperCase();
+  if (!t) return null;
+
+  if (
+    t.includes('ACQUIR') ||
+    t.includes('PAYMENT') ||
+    t.includes('TRANSFER') ||
+    t.includes('BANK') ||
+    t.includes('EKVAYR')
+  ) {
+    return 'acquiring';
+  }
+
+  if (
+    t.includes('DELIVERY') ||
+    t.includes('LOGISTIC') ||
+    t.includes('FULFILL') ||
+    t.includes('STORAGE') ||
+    t.includes('SORT') ||
+    t.includes('RETURN') ||
+    t.includes('MIDDLE_MILE') ||
+    t.includes('CROSSREGIONAL')
+  ) {
+    return 'logistics';
+  }
+
+  if (
+    t.includes('FEE') ||
+    t.includes('COMMISSION') ||
+    t.includes('MARKET') ||
+    t.includes('AGENCY') ||
+    t.includes('SERVICE')
+  ) {
+    return 'fees';
+  }
+
+  return null;
+}
 function sumCommissions(list) {
   const out = { fees: 0, acquiring: 0, logistics: 0 };
   if (!Array.isArray(list)) return out;
 
   for (const c of list) {
-    const type = String(c?.type || c?.service || c?.name || '').toUpperCase();
+    const type = c?.type || c?.service || c?.name || '';
     const amount =
       Number(c?.actual) ||
       Number(c?.amount) ||
@@ -92,39 +131,86 @@ function sumCommissions(list) {
       0;
     if (!amount) continue;
 
-    if (['FEE', 'LOYALTY_PARTICIPATION_FEE', 'AUCTION_PROMOTION', 'INSTALLMENT'].includes(type)) {
-      out.fees += amount;
-      continue;
-    }
-    if (['AGENCY', 'AGENCY_COMMISSION', 'PAYMENT_TRANSFER'].includes(type)) {
-      out.acquiring += amount;
-      continue;
-    }
-    if (
-      [
-        'DELIVERY_TO_CUSTOMER',
-        'EXPRESS_DELIVERY_TO_CUSTOMER',
-        'RETURNED_ORDERS_STORAGE',
-        'SORTING',
-        'INTAKE_SORTING',
-        'RETURN_PROCESSING',
-        'FULFILLMENT',
-        'MIDDLE_MILE',
-        'CROSSREGIONAL_DELIVERY',
-        'DELIVERY',
-        'EXPRESS_DELIVERY',
-        'LOGISTICS'
-      ].includes(type)
-    ) {
-      out.logistics += amount;
-      continue;
-    }
-
-    // Unknown commission type -> keep under fees to not lose costs
-    out.fees += amount;
+    const bucket = classifyCharge(type);
+    if (bucket === 'acquiring') out.acquiring += Math.abs(amount);
+    else if (bucket === 'logistics') out.logistics += Math.abs(amount);
+    else if (bucket === 'fees') out.fees += Math.abs(amount);
+    else out.fees += Math.abs(amount);
   }
 
   return out;
+}
+
+function sumPayoutCharges(payouts) {
+  const out = { fees: 0, acquiring: 0, logistics: 0 };
+  if (!Array.isArray(payouts)) return out;
+
+  for (const p of payouts) {
+    const items = []
+      .concat(p?.services || [])
+      .concat(p?.items || [])
+      .concat(p?.operations || [])
+      .concat(p?.transactions || [])
+      .concat(p?.accruals || [])
+      .concat(p?.charges || [])
+      .concat(p?.payoutItems || []);
+
+    for (const it of items) {
+      const type =
+        it?.type || it?.service || it?.name || it?.operationType || it?.serviceName || it?.title;
+      const amount = readMoney(
+        it?.amount ??
+          it?.value ??
+          it?.total ??
+          it?.price ??
+          it?.sum ??
+          it?.cost ??
+          it?.fee
+      );
+      if (!amount) continue;
+
+      const bucket = classifyCharge(type);
+      if (!bucket) continue;
+      out[bucket] += Math.abs(amount);
+    }
+  }
+
+  return out;
+}
+
+function normalizeStatus(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function classifyOrderStatus(order) {
+  const status = normalizeStatus(order?.status);
+  const sub =
+    normalizeStatus(order?.substatus || order?.subStatus || order?.statusDetails || order?.sub_status);
+  const text = `${status} ${sub}`.trim();
+  if (!text) return { bucket: 'new', cancelled: false };
+
+  const cancelled =
+    text.includes('CANCEL') ||
+    text.includes('REJECT') ||
+    text.includes('UNPAID_CANCELLED') ||
+    text.includes('CANCELLED');
+  if (cancelled) return { bucket: 'cancelled', cancelled: true };
+
+  if (text.includes('DELIVERED')) return { bucket: 'delivered', cancelled: false };
+
+  if (
+    text.includes('DELIVERY') ||
+    text.includes('PICKUP') ||
+    text.includes('SHIP') ||
+    text.includes('SORT') ||
+    text.includes('PACK') ||
+    text.includes('READY') ||
+    text.includes('PROCESS')
+  ) {
+    return { bucket: 'warehouse', cancelled: false };
+  }
+
+  return { bucket: 'new', cancelled: false };
 }
 
 function getItemRevenue(it) {
@@ -142,6 +228,21 @@ function getItemRevenue(it) {
 
 function sumByKeys(items, keys) {
   return items.reduce((sum, it) => sum + pickNumber(it, keys), 0);
+}
+
+function applyTotalToItems(itemAgg, field, total, currentTotal, revenue) {
+  if (!total || total <= 0) return currentTotal;
+  if (currentTotal > 0) {
+    const k = total / currentTotal;
+    for (const it of itemAgg.values()) {
+      it[field] = (it[field] || 0) * k;
+    }
+  } else if (revenue > 0) {
+    for (const it of itemAgg.values()) {
+      it[field] = (it.revenue || 0) * (total / revenue);
+    }
+  }
+  return total;
 }
 
 async function syncDay(projectId, date) {
@@ -257,6 +358,9 @@ async function syncDay(projectId, date) {
 
   let revenue = 0;
   let ordersCount = 0;
+  let ordersCreated = 0;
+  let ordersWarehouse = 0;
+  let ordersDelivered = 0;
   let fees = 0;
   let acquiring = 0;
   let logistics = 0;
@@ -265,17 +369,14 @@ async function syncDay(projectId, date) {
   const itemAgg = new Map();
   const returnsBySku = new Map();
 
-  const payoutAcquiring = sumByKeys(payouts, [
-    'acquiring',
-    'acquiringFee',
-    'paymentFee',
-    'paymentProcessingFee',
-    'bankFee',
-    'processingFee'
-  ]);
-
   for (const o of orders) {
     ordersCount += 1;
+    const cls = classifyOrderStatus(o);
+    if (!cls.cancelled) {
+      ordersCreated += 1;
+      if (cls.bucket === 'delivered') ordersDelivered += 1;
+      else if (cls.bucket === 'warehouse') ordersWarehouse += 1;
+    }
     let orderRevenue =
       pickNumber(o, [
         'total',
@@ -426,24 +527,49 @@ async function syncDay(projectId, date) {
     }
   }
 
-  if (payoutAcquiring > 0) {
-    if (acquiring > 0) {
-      const k = payoutAcquiring / acquiring;
-      for (const it of itemAgg.values()) {
-        it.acquiring *= k;
-      }
-    } else if (revenue > 0) {
-      for (const it of itemAgg.values()) {
-        it.acquiring = (it.revenue / revenue) * payoutAcquiring;
-      }
-    }
-    acquiring = payoutAcquiring;
+  const payoutAcquiring = sumByKeys(payouts, [
+    'acquiring',
+    'acquiringFee',
+    'paymentFee',
+    'paymentProcessingFee',
+    'bankFee',
+    'processingFee'
+  ]);
+  const payoutCharges = sumPayoutCharges(payouts);
+  if (payoutAcquiring > 0 && payoutCharges.acquiring === 0) {
+    payoutCharges.acquiring = payoutAcquiring;
   }
+
+  fees = applyTotalToItems(itemAgg, 'fees', payoutCharges.fees, fees, revenue);
+  logistics = applyTotalToItems(itemAgg, 'logistics', payoutCharges.logistics, logistics, revenue);
+  acquiring = applyTotalToItems(itemAgg, 'acquiring', payoutCharges.acquiring, acquiring, revenue);
 
   await prisma.sellerDaily.upsert({
     where: { projectId_date: { projectId, date: day } },
-    update: { revenue, orders: ordersCount, fees, acquiring, logistics, returns: returnsSum },
-    create: { projectId, date: day, revenue, orders: ordersCount, fees, acquiring, logistics, returns: returnsSum }
+    update: {
+      revenue,
+      orders: ordersCount,
+      ordersCreated,
+      ordersWarehouse,
+      ordersDelivered,
+      fees,
+      acquiring,
+      logistics,
+      returns: returnsSum
+    },
+    create: {
+      projectId,
+      date: day,
+      revenue,
+      orders: ordersCount,
+      ordersCreated,
+      ordersWarehouse,
+      ordersDelivered,
+      fees,
+      acquiring,
+      logistics,
+      returns: returnsSum
+    }
   });
 
   await prisma.sellerItemDaily.deleteMany({ where: { projectId, date: day } });
@@ -464,7 +590,18 @@ async function syncDay(projectId, date) {
     });
   }
 
-  return { revenue, orders: ordersCount, fees, acquiring, logistics, returns: returnsSum, errors };
+  return {
+    revenue,
+    orders: ordersCount,
+    ordersCreated,
+    ordersWarehouse,
+    ordersDelivered,
+    fees,
+    acquiring,
+    logistics,
+    returns: returnsSum,
+    errors
+  };
 }
 
 module.exports = { syncDay };

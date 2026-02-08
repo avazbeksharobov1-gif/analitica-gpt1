@@ -71,14 +71,14 @@ function setupAlerts(bot, ADMIN_IDS = []) {
         }
 
         const msg =
-          `ALERT: Weekly drop\nProject: ${project.name}\n\n` +
-          `Revenue last week: ${lastWeek.revenue}\n` +
-          `Revenue this week: ${thisWeek.revenue}\n` +
-          `Revenue drop: ${revenueDrop.toFixed(1)}%\n\n` +
-          `Profit last week: ${lastWeek.profit}\n` +
-          `Profit this week: ${thisWeek.profit}\n` +
-          `Profit drop: ${profitDrop.toFixed(1)}%` +
-          (insight ? `\n\nAI insight:\n${insight}` : '');
+          `⚠️ Haftalik pasayish\nLoyiha: ${project.name}\n\n` +
+          `Daromad (otgan hafta): ${lastWeek.revenue}\n` +
+          `Daromad (shu hafta): ${thisWeek.revenue}\n` +
+          `Daromad pasayishi: ${revenueDrop.toFixed(1)}%\n\n` +
+          `Foyda (otgan hafta): ${lastWeek.profit}\n` +
+          `Foyda (shu hafta): ${thisWeek.profit}\n` +
+          `Foyda pasayishi: ${profitDrop.toFixed(1)}%` +
+          (insight ? `\n\nAI tahlil:\n${insight}` : '');
 
         for (const id of targets) {
           await bot.telegram.sendMessage(id, msg);
@@ -104,12 +104,12 @@ function setupAlerts(bot, ADMIN_IDS = []) {
           if (!targets.length) continue;
 
           const msg =
-            `ALERT: Daily margin/profit\nProject: ${p.name}\nDate: ${label}\n\n` +
-            `Revenue: ${s.revenue}\n` +
-            `Orders: ${s.orders}\n` +
-            `Profit: ${s.profit}\n` +
-            `Margin: ${margin.toFixed(1)}%\n\n` +
-            `Thresholds: margin < ${marginMinPct}% or profit < 0`;
+            `⚠️ Kunlik marja/foyda ogohlantirish\nLoyiha: ${p.name}\nSana: ${label}\n\n` +
+            `Daromad: ${s.revenue}\n` +
+            `Buyurtmalar: ${s.orders}\n` +
+            `Foyda: ${s.profit}\n` +
+            `Marja: ${margin.toFixed(1)}%\n\n` +
+            `Mezon: marja < ${marginMinPct}% yoki foyda < 0`;
 
           for (const id of targets) {
             await bot.telegram.sendMessage(id, msg);

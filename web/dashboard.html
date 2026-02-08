@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Analitica Dashboard</title>
+  <title>Analitica Boshqaruv</title>
   <link rel="stylesheet" href="/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script defer src="/main.js"></script>
@@ -20,8 +20,8 @@
       </div>
 
       <nav class="nav">
-        <a class="nav-item active" href="#dash">Dashboard</a>
-        <a class="nav-item" href="#products">Tovarlar</a>
+        <a class="nav-item active" href="#dash">Boshqaruv</a>
+        <a class="nav-item" href="#products">Mahsulotlar</a>
         <a class="nav-item" href="#expenses">Xarajatlar</a>
         <a class="nav-item" href="#ai">AI tahlil</a>
       </nav>
@@ -34,7 +34,7 @@
     <div class="app-main">
       <header class="topbar">
         <div class="topbar-left">
-          <h1>Dashboard</h1>
+          <h1>Boshqaruv paneli</h1>
           <p class="muted">Kundalik va haftalik holat</p>
         </div>
 
@@ -48,7 +48,7 @@
           <div class="actions">
             <select id="projectSelect" class="btn ghost"></select>
             <button class="btn" id="refreshBtn">Yangilash</button>
-            <button class="btn ghost" id="syncRangeBtn">30 kunlik sync</button>
+            <button class="btn ghost" id="syncRangeBtn">30 kunlik sinxronlash</button>
             <a class="btn ghost" id="exportExcel" href="#">Excel</a>
             <a class="btn ghost" id="exportPdf" href="#">PDF</a>
             <button class="btn primary" id="aiBtn">AI yangilash</button>
@@ -64,10 +64,10 @@
             <div class="kpi-sub" id="kpi-range">Davr: 7 kun</div>
           </div>
           <div class="card">
-            <div class="kpi-label">Buyurtmalar</div>
-            <div class="kpi-value" id="kpi-orders">0</div>
-            <div class="kpi-sub">Jami buyurtma</div>
-          </div>
+          <div class="kpi-label">Buyurtmalar</div>
+          <div class="kpi-value" id="kpi-orders">0</div>
+          <div class="kpi-sub">Jami buyurtma</div>
+        </div>
           <div class="card">
             <div class="kpi-label">Xarajat</div>
             <div class="kpi-value danger" id="kpi-expenses">0</div>
@@ -77,6 +77,24 @@
             <div class="kpi-label">Foyda</div>
             <div class="kpi-value success" id="kpi-profit">0</div>
             <div class="kpi-sub" id="kpi-margin">Marja: 0%</div>
+          </div>
+        </section>
+
+        <section class="kpi-grid">
+          <div class="card">
+            <div class="kpi-label">Yangi buyurtmalar</div>
+            <div class="kpi-value" id="kpi-orders-new">0</div>
+            <div class="kpi-sub">Kelgan buyurtmalar</div>
+          </div>
+          <div class="card">
+            <div class="kpi-label">Omborga topshirilgan</div>
+            <div class="kpi-value" id="kpi-orders-warehouse">0</div>
+            <div class="kpi-sub">Yo`lda / omborda</div>
+          </div>
+          <div class="card">
+            <div class="kpi-label">Yetkazilgan</div>
+            <div class="kpi-value" id="kpi-orders-delivered">0</div>
+            <div class="kpi-sub">Mijozga topshirilgan</div>
           </div>
         </section>
 
@@ -90,7 +108,7 @@
           <div class="panel">
             <div class="panel-header">
               <h3>30 kunlik prognoz</h3>
-              <span class="muted">Forecast</span>
+              <span class="muted">Prognoz</span>
             </div>
             <canvas id="forecastChart" height="120"></canvas>
           </div>

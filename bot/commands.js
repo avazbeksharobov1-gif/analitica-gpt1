@@ -19,11 +19,11 @@ const BASE_URL =
   (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '');
 const DASHBOARD_URL = process.env.DASHBOARD_URL || process.env.PUBLIC_BASE_URL || BASE_URL;
 
-const BUTTON_DASHBOARD = 'Dashboard';
-const BUTTON_SYNC = 'Sync';
-const BUTTON_EXPENSE = 'Xarajat';
-const BUTTON_REPORT = 'Report';
-const BUTTON_SETTINGS = 'Sozlamalar';
+const BUTTON_DASHBOARD = '📊 Boshqaruv';
+const BUTTON_SYNC = '🔄 Sinxron';
+const BUTTON_EXPENSE = '💸 Xarajat';
+const BUTTON_REPORT = '📄 Hisobot';
+const BUTTON_SETTINGS = '⚙️ Sozlamalar';
 
 const projectByChat = new Map();
 const expenseFlow = new Map();
@@ -88,11 +88,11 @@ async function startExpenseFlow(ctx) {
 
 async function sendDashboard(ctx) {
   if (!DASHBOARD_URL) {
-    return ctx.reply('Dashboard URL topilmadi. Railway domainni tekshiring.');
+    return ctx.reply('Boshqaruv paneli URL topilmadi. Railway domainni tekshiring.');
   }
   return ctx.reply(
-    'Dashboard:',
-    Markup.inlineKeyboard([Markup.button.url('Dashboard', `${DASHBOARD_URL}/dashboard`)])
+    '📊 Boshqaruv paneli havolasi:',
+    Markup.inlineKeyboard([Markup.button.url('Boshqaruv paneli', `${DASHBOARD_URL}/dashboard`)])
   );
 }
 
@@ -104,7 +104,7 @@ function mainMenu() {
 }
 
 function sendMainMenu(ctx, text) {
-  return ctx.reply(text || 'Menu', mainMenu());
+  return ctx.reply(text || '📋 Asosiy menyu', mainMenu());
 }
 
 async function sendReport(ctx, days) {
@@ -135,8 +135,8 @@ async function sendReport(ctx, days) {
       data: {
         labels,
         datasets: [
-          { label: 'Revenue', data: revenue, borderColor: '#2563eb', fill: false },
-          { label: 'Profit', data: profit, borderColor: '#16a34a', fill: false }
+          { label: 'Daromad', data: revenue, borderColor: '#2563eb', fill: false },
+          { label: 'Foyda', data: profit, borderColor: '#16a34a', fill: false }
         ]
       }
     });
@@ -165,9 +165,9 @@ async function syncToday(ctx) {
     const projectId = getProjectId(ctx);
     const date = new Date();
     await syncDay(projectId, date);
-    ctx.reply(`Synced ${date.toISOString().slice(0, 10)}`);
+    ctx.reply(`Sinxronlash tugadi: ${date.toISOString().slice(0, 10)}`);
   } catch (e) {
-    ctx.reply('Sync failed');
+    ctx.reply('Sinxronlash xato');
   }
 }
 
@@ -177,26 +177,27 @@ function setupCommands(bot) {
     projectByChat.set(String(ctx.chat.id), p.id);
     sendMainMenu(
       ctx,
-      'Analitica Bot\n\n' +
-        '/dashboard - Dashboard link\n' +
-        '/stats - Kunlik KPI\n' +
-        '/month - 30 kun KPI\n' +
-        '/compare - Hafta taqqoslash\n' +
-        '/forecast - 30 kun prognoz\n' +
-        '/report [days] - PDF report (default 7)\n' +
-        '/harajat - xarajat kiritish (tugma)\n' +
-        '/insight - AI insight\n' +
-        '/recommend - AI tavsiya\n' +
-        '/sync [YYYY-MM-DD] - Sync seller data\n' +
-        '/projects - Project list\n' +
-        '/project <id> - Select project\n' +
-        '/alerts on|off - Profit drop alerts\n' +
-        '/cancel - bekor qilish\n' +
-        'Expense format: xarajat svet 150000'
+      "Assalomu alaykum! Analitica Bot.\n\n" +
+        "Buyruqlar:\n" +
+        "📊 /dashboard - Boshqaruv paneli havolasi\n" +
+        "📈 /stats - Bugungi KPI\n" +
+        "📆 /month - 30 kun KPI\n" +
+        "🔁 /compare - Haftalik taqqoslash\n" +
+        "📉 /forecast - 30 kun prognoz\n" +
+        "📄 /report [kun] - PDF hisobot (standart 7)\n" +
+        "💸 /xarajat - Xarajat kiritish (tugma)\n" +
+        "🤖 /insight - AI tahlil\n" +
+        "💡 /recommend - AI tavsiya\n" +
+        "🔄 /sync [YYYY-MM-DD] - Yandex sinxronlash\n" +
+        "📚 /projects - Loyihalar ro'yxati\n" +
+        "🧩 /project <id> - Loyihani tanlash\n" +
+        "🔔 /alerts on|off - Foyda pasaysa ogohlantirish\n" +
+        "❌ /cancel - Bekor qilish\n\n" +
+        "Xarajat formati: xarajat svet 150000"
     );
   });
 
-  bot.command('menu', (ctx) => sendMainMenu(ctx, 'Menu'));
+  bot.command('menu', (ctx) => sendMainMenu(ctx, '📋 Asosiy menyu'));
 
   bot.command('dashboard', sendDashboard);
   bot.hears(/dashboard|dash|panel/i, sendDashboard);
@@ -212,7 +213,7 @@ function setupCommands(bot) {
   bot.command('cancel', async (ctx) => {
     const chatId = String(ctx.chat.id);
     expenseFlow.delete(chatId);
-    sendMainMenu(ctx, 'Bekor qilindi');
+    sendMainMenu(ctx, "Bekor qilindi");
   });
 
   bot.command('project', async (ctx) => {
@@ -220,7 +221,7 @@ function setupCommands(bot) {
     const id = Number(parts[1]);
     if (!id) return ctx.reply('Format: /project 1');
     const p = await prisma.project.findUnique({ where: { id } });
-    if (!p) return ctx.reply('Project topilmadi');
+    if (!p) return ctx.reply('Loyiha topilmadi');
     projectByChat.set(String(ctx.chat.id), p.id);
     ctx.reply(`Tanlandi: ${p.name}`);
   });
@@ -233,6 +234,9 @@ function setupCommands(bot) {
       `Kunlik KPI\n\n` +
         `Daromad: ${s.revenue}\n` +
         `Buyurtmalar: ${s.orders}\n` +
+        `Yangi buyurtmalar: ${s.ordersCreated || 0}\n` +
+        `Omborga topshirilgan: ${s.ordersWarehouse || 0}\n` +
+        `Yetkazilgan: ${s.ordersDelivered || 0}\n` +
         `Komissiya: ${s.fees}\n` +
         `Ekvayring: ${s.acquiring}\n` +
         `Logistika: ${s.logistics}\n` +
@@ -253,6 +257,9 @@ function setupCommands(bot) {
       `30 kunlik KPI\n\n` +
         `Daromad: ${s.revenue}\n` +
         `Buyurtmalar: ${s.orders}\n` +
+        `Yangi buyurtmalar: ${s.ordersCreated || 0}\n` +
+        `Omborga topshirilgan: ${s.ordersWarehouse || 0}\n` +
+        `Yetkazilgan: ${s.ordersDelivered || 0}\n` +
         `Komissiya: ${s.fees}\n` +
         `Ekvayring: ${s.acquiring}\n` +
         `Logistika: ${s.logistics}\n` +
@@ -272,10 +279,10 @@ function setupCommands(bot) {
       `Hafta taqqoslash\n\n` +
         `Daromad (shu hafta): ${thisWeek.revenue}\n` +
         `Daromad (otgan hafta): ${lastWeek.revenue}\n` +
-        `Ozgarish: ${diff.toFixed(1)}%\n\n` +
+        `O'zgarish: ${diff.toFixed(1)}%\n\n` +
         `Foyda (shu hafta): ${thisWeek.profit}\n` +
         `Foyda (otgan hafta): ${lastWeek.profit}\n` +
-        `Ozgarish: ${profitDiff.toFixed(1)}%`
+        `O'zgarish: ${profitDiff.toFixed(1)}%`
     );
   });
 
@@ -297,7 +304,7 @@ function setupCommands(bot) {
       const days = parts[1] ? Number(parts[1]) : 7;
       await sendReport(ctx, days);
     } catch (e) {
-      ctx.reply('Report failed');
+      ctx.reply('Hisobotda xato');
     }
   });
 
@@ -310,36 +317,36 @@ function setupCommands(bot) {
         return ctx.reply('Format: /sync 2026-02-07');
       }
       await syncDay(projectId, date);
-      ctx.reply(`Synced ${date.toISOString().slice(0, 10)}`);
+      ctx.reply(`Sinxronlash tugadi: ${date.toISOString().slice(0, 10)}`);
     } catch (e) {
-      ctx.reply('Sync failed');
+      ctx.reply('Sinxronlashda xato');
     }
   });
 
   bot.command('insight', async (ctx) => {
-    if (AI_DISABLED) return ctx.reply('AI vaqtincha ochirilgan');
+    if (AI_DISABLED) return ctx.reply("AI vaqtincha o'chirilgan");
     const projectId = getProjectId(ctx);
     const { thisWeek, lastWeek } = await getCompareStats(projectId);
     const text = await aiInsight(lastWeek.revenue, thisWeek.revenue);
-    ctx.reply(`AI insight\n\n${text}`);
+    ctx.reply(`AI tahlil\n\n${text}`);
   });
 
   bot.command('recommend', async (ctx) => {
     try {
-      if (AI_DISABLED) return ctx.reply('AI vaqtincha ochirilgan');
+      if (AI_DISABLED) return ctx.reply("AI vaqtincha o'chirilgan");
       const projectId = getProjectId(ctx);
       const today = new Date();
       const text = await aiRecommend(await getKpi(projectId, today, today));
       ctx.reply(`AI tavsiya\n\n${text}`);
     } catch (e) {
-      ctx.reply('AI not available');
+      ctx.reply('AI mavjud emas');
     }
   });
 
   bot.command('projects', async (ctx) => {
     const list = await listProjects();
-    const text = list.map(p => `${p.id}. ${p.name}`).join('\n') || 'Empty';
-    ctx.reply(`Projects\n\n${text}`);
+    const text = list.map(p => `${p.id}. ${p.name}`).join('\n') || "Bo'sh";
+    ctx.reply(`Loyihalar\n\n${text}`);
   });
 
   bot.command('alerts', async (ctx) => {
@@ -351,18 +358,18 @@ function setupCommands(bot) {
       update: { enabled: on },
       create: { projectId, chatId, enabled: on }
     });
-    ctx.reply(on ? 'Alerts enabled' : 'Alerts disabled');
+    ctx.reply(on ? 'Ogohlantirish yoqildi' : "Ogohlantirish o'chirildi");
   });
 
   bot.hears(/^(expense|harajat)\s+/i, async (ctx) => {
     try {
       const projectId = getProjectId(ctx);
       const parsed = parseExpense(ctx.message.text);
-      if (!parsed) return ctx.reply('Format: expense svet 150000');
+      if (!parsed) return ctx.reply('Format: xarajat svet 150000');
       await addExpense(projectId, parsed.category, parsed.amount, parsed.note);
-      ctx.reply('Added');
+      ctx.reply("Qo'shildi");
     } catch (e) {
-      ctx.reply('Failed to add expense');
+      ctx.reply("Xarajatni qo'shib bo'lmadi");
     }
   });
 
@@ -382,24 +389,24 @@ function setupCommands(bot) {
         }
       });
       if (!cat) {
-        return ctx.reply('Kategoriya topilmadi. Qayta tanlang.');
-      }
-      expenseFlow.set(chatId, { step: 'amount', projectId: state.projectId, categoryCode: cat.code });
-      return ctx.reply('Summani kiriting (masalan: 150000 Izoh)', Markup.removeKeyboard());
+      return ctx.reply('Kategoriya topilmadi. Qayta tanlang.');
     }
+    expenseFlow.set(chatId, { step: 'amount', projectId: state.projectId, categoryCode: cat.code });
+    return ctx.reply('Summani kiriting (masalan: 150000 Izoh)', Markup.removeKeyboard());
+  }
 
     if (state.step === 'amount') {
       const parts = text.split(/\s+/);
       const amount = Number(parts[0]);
       if (Number.isNaN(amount)) {
-        return ctx.reply('Summa xato. Faqat raqam kiriting.');
-      }
-      const note = parts.slice(1).join(' ') || null;
-      await addExpense(state.projectId, state.categoryCode, amount, note);
-      expenseFlow.delete(chatId);
-      return sendMainMenu(ctx, "Xarajat qo'shildi");
+      return ctx.reply('Summa xato. Faqat raqam kiriting.');
     }
-  });
+    const note = parts.slice(1).join(' ') || null;
+    await addExpense(state.projectId, state.categoryCode, amount, note);
+    expenseFlow.delete(chatId);
+    return sendMainMenu(ctx, "Xarajat qo'shildi");
+  }
+});
 }
 
 module.exports = setupCommands;

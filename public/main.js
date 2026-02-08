@@ -61,7 +61,7 @@ function updateProjectSelect(projects, currentId) {
   const select = document.getElementById('projectSelect');
   if (!select) return;
   if (!projects.length) {
-    select.innerHTML = '<option value="">Project yoq</option>';
+    select.innerHTML = "<option value=\"\">Loyiha yo'q</option>";
     return;
   }
   select.innerHTML = projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
@@ -77,6 +77,15 @@ async function loadKpi(range) {
 
   document.getElementById('kpi-revenue').innerText = fmt(s.revenue);
   document.getElementById('kpi-orders').innerText = fmt(s.orders);
+  const ordersNew = s.ordersCreated || s.ordersNew || 0;
+  const ordersWarehouse = s.ordersWarehouse || s.ordersInWarehouse || 0;
+  const ordersDelivered = s.ordersDelivered || s.ordersDone || 0;
+  const elNew = document.getElementById('kpi-orders-new');
+  const elWh = document.getElementById('kpi-orders-warehouse');
+  const elDel = document.getElementById('kpi-orders-delivered');
+  if (elNew) elNew.innerText = fmt(ordersNew);
+  if (elWh) elWh.innerText = fmt(ordersWarehouse);
+  if (elDel) elDel.innerText = fmt(ordersDelivered);
   document.getElementById('kpi-expenses').innerText = fmt(
     s.expenses +
       s.fees +
@@ -122,13 +131,13 @@ async function loadCompare() {
 async function loadForecast() {
   const r = await fetch('/api/forecast-compare');
   const d = await r.json();
-  const labels = d.current.map((_, i) => `Day ${i + 1}`);
+  const labels = d.current.map((_, i) => `Kun ${i + 1}`);
 
   const data = {
     labels,
     datasets: [
-      { label: 'Current', data: d.current, borderColor: '#22c55e', tension: 0.4 },
-      { label: 'Previous', data: d.previous, borderColor: '#ef4444', tension: 0.4 }
+      { label: 'Joriy', data: d.current, borderColor: '#22c55e', tension: 0.4 },
+      { label: 'Oldingi', data: d.previous, borderColor: '#ef4444', tension: 0.4 }
     ]
   };
 
@@ -158,8 +167,8 @@ async function loadDailySeries(range) {
   const data = {
     labels,
     datasets: [
-      { label: 'Revenue', data: revenue, borderColor: '#2563eb', tension: 0.35 },
-      { label: 'Profit', data: profit, borderColor: '#16a34a', tension: 0.35 }
+      { label: 'Daromad', data: revenue, borderColor: '#2563eb', tension: 0.35 },
+      { label: 'Foyda', data: profit, borderColor: '#16a34a', tension: 0.35 }
     ]
   };
 
@@ -265,7 +274,7 @@ async function loadProducts(range) {
   const tbody = document.getElementById('productTable');
   const count = document.getElementById('productsCount');
   if (!Array.isArray(products) || !Array.isArray(metrics)) {
-    tbody.innerHTML = '<tr><td colspan="12">Malumot yoq</td></tr>';
+    tbody.innerHTML = "<tr><td colspan=\"12\">Ma'lumot yo'q</td></tr>";
     count.innerText = '0 ta';
     return [];
   }
@@ -359,10 +368,10 @@ async function loadAI() {
       fetch('/api/products/insight').then(r => r.text())
     ]);
 
-    set('aiInsight', insight || 'Malumot yoq');
-    set('aiRecommend', recommend || 'Malumot yoq');
-    set('aiAnomaly', anomaly || 'Malumot yoq');
-    set('aiProduct', product || 'Malumot yoq');
+    set('aiInsight', insight || "Ma'lumot yo'q");
+    set('aiRecommend', recommend || "Ma'lumot yo'q");
+    set('aiAnomaly', anomaly || "Ma'lumot yo'q");
+    set('aiProduct', product || "Ma'lumot yo'q");
     document.getElementById('aiStatus').innerText = 'Tayyor';
   } catch (e) {
     set('aiInsight', 'AI mavjud emas');
@@ -448,7 +457,7 @@ function setupActions() {
       });
       await loadAll();
       syncRangeBtn.disabled = false;
-      syncRangeBtn.innerText = '30 kunlik sync';
+      syncRangeBtn.innerText = '30 kunlik sinxronlash';
     });
   }
 
@@ -504,7 +513,7 @@ function updateSkuSelect(items) {
   const select = document.getElementById('skuSelect');
   if (!select) return;
   if (!items.length) {
-    select.innerHTML = '<option value="">No SKU</option>';
+    select.innerHTML = "<option value=\"\">SKU yo'q</option>";
     return;
   }
 
@@ -537,8 +546,8 @@ async function loadSkuSeries(sku, range) {
   const data = {
     labels,
     datasets: [
-      { label: 'Revenue', data: revenue, borderColor: '#0ea5e9', tension: 0.35 },
-      { label: 'Profit', data: profit, borderColor: '#16a34a', tension: 0.35 }
+      { label: 'Daromad', data: revenue, borderColor: '#0ea5e9', tension: 0.35 },
+      { label: 'Foyda', data: profit, borderColor: '#16a34a', tension: 0.35 }
     ]
   };
 

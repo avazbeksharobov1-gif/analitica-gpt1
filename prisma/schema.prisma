@@ -152,6 +152,9 @@ model SellerDaily {
   date       DateTime
   revenue    Float    @default(0)
   orders     Int      @default(0)
+  ordersCreated   Int @default(0)
+  ordersWarehouse Int @default(0)
+  ordersDelivered Int @default(0)
   fees       Float    @default(0)
   acquiring  Float    @default(0)
   logistics  Float    @default(0)

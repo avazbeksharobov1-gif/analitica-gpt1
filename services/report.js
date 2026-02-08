@@ -6,29 +6,34 @@ function fmtDate(d) {
 }
 
 function renderReport(doc, stats, opts = {}) {
-  doc.fontSize(18).text('Analitica Report', { underline: true });
+  doc.fontSize(18).text('Analitica Hisobot', { underline: true });
   doc.moveDown();
 
   const rangeLabel = opts.range ? `${fmtDate(opts.range.from)} - ${fmtDate(opts.range.to)}` : '';
-  if (opts.projectName) doc.fontSize(12).text(`Project: ${opts.projectName}`);
-  if (rangeLabel) doc.fontSize(12).text(`Range: ${rangeLabel}`);
-  doc.fontSize(12).text(`Generated: ${new Date().toLocaleString()}`);
+  if (opts.projectName) doc.fontSize(12).text(`Loyiha: ${opts.projectName}`);
+  if (rangeLabel) doc.fontSize(12).text(`Davr: ${rangeLabel}`);
+  doc.fontSize(12).text(`Yaratilgan: ${new Date().toLocaleString()}`);
   doc.moveDown();
 
   doc.fontSize(12)
-    .text(`Revenue: ${stats.revenue}`)
-    .text(`Orders: ${stats.orders}`)
-    .text(`Fees: ${stats.fees}`)
-    .text(`Acquiring: ${stats.acquiring}`)
-    .text(`Logistics: ${stats.logistics}`)
-    .text(`Returns: ${stats.returns}`)
-    .text(`Expenses: ${stats.expenses}`)
+    .text(`Daromad: ${stats.revenue}`)
+    .text(`Buyurtmalar: ${stats.orders}`)
+    .text(`Yangi buyurtmalar: ${stats.ordersCreated || 0}`)
+    .text(`Omborga topshirilgan: ${stats.ordersWarehouse || 0}`)
+    .text(`Yetkazilgan: ${stats.ordersDelivered || 0}`)
+    .text(`Komissiya: ${stats.fees}`)
+    .text(`Ekvayring: ${stats.acquiring}`)
+    .text(`Logistika: ${stats.logistics}`)
+    .text(`Qaytarish: ${stats.returns}`)
+    .text(`Xarajat: ${stats.expenses}`)
+    .text(`Soliq 1%: ${stats.tax1 || 0}`)
+    .text(`Ijtimoiy soliq: ${stats.socialTax || 0}`)
     .text(`COGS: ${stats.cogs}`)
-    .text(`Profit: ${stats.profit}`);
+    .text(`Foyda: ${stats.profit}`);
 
   if (opts.chartImage) {
     doc.addPage();
-    doc.fontSize(14).text('Daily revenue & profit', { underline: true });
+    doc.fontSize(14).text('Kunlik daromad va foyda', { underline: true });
     doc.moveDown();
     doc.image(opts.chartImage, { fit: [520, 280], align: 'center' });
   }
