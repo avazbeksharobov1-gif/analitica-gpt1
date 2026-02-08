@@ -4,7 +4,8 @@ const {
   fetchReturnsByDate,
   fetchPayoutsByDate,
   getCampaignIds,
-  getApiKeys
+  getApiKeys,
+  fetchReturnById
 } = require('./yandexSeller');
 const { getSellerConfig } = require('./projectTokens');
 
@@ -35,6 +36,49 @@ function pickNumber(obj, keys) {
     }
   }
   return 0;
+}
+
+function readMoney(val) {
+  if (val === undefined || val === null || val === '') return 0;
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') {
+    const n = Number(val.replace(',', '.'));
+    return Number.isFinite(n) ? n : 0;
+  }
+  if (typeof val === 'object') {
+    if (val.value !== undefined) return readMoney(val.value);
+    if (val.amount !== undefined) return readMoney(val.amount);
+    if (val.refundAmount !== undefined) return readMoney(val.refundAmount);
+    if (val.totalAmount !== undefined) return readMoney(val.totalAmount);
+    if (val.price !== undefined) return readMoney(val.price);
+    if (val.sum !== undefined) return readMoney(val.sum);
+  }
+  return 0;
+}
+
+function extractReturnAmount(r) {
+  return (
+    readMoney(r?.refundAmount) ||
+    readMoney(r?.amount) ||
+    readMoney(r?.totalAmount) ||
+    readMoney(r?.price) ||
+    0
+  );
+}
+
+function extractItemReturnAmount(it) {
+  if (!it) return 0;
+  if (Array.isArray(it.decisions)) {
+    const sum = it.decisions.reduce((s, d) => s + readMoney(d?.amount), 0);
+    if (sum) return sum;
+  }
+  return (
+    readMoney(it.refundAmount) ||
+    readMoney(it.amount) ||
+    readMoney(it.totalAmount) ||
+    readMoney(it.price) ||
+    0
+  );
 }
 
 function sumCommissions(list) {
@@ -128,6 +172,9 @@ async function syncDay(projectId, date) {
   const returns = [];
   const payouts = [];
 
+  const returnType = process.env.YANDEX_RETURNS_TYPE;
+  const returnStatuses = process.env.YANDEX_RETURNS_STATUSES;
+
   const pairs = [];
   if (tokenMap.length) {
     for (const entry of tokenMap) {
@@ -153,7 +200,11 @@ async function syncDay(projectId, date) {
         console.error('Yandex orders error:', e.message);
         return { orders: [] };
       }),
-      fetchReturnsByDate(dateStr, dateStr, campaignId, apiKey, requestOptions).catch((e) => {
+      fetchReturnsByDate(dateStr, dateStr, campaignId, apiKey, {
+        ...requestOptions,
+        returnType,
+        returnStatuses
+      }).catch((e) => {
         errors[`${campaignId}:returns`] = e.message || String(e);
         console.error('Yandex returns error:', e.message);
         return { returns: [] };
@@ -173,7 +224,10 @@ async function syncDay(projectId, date) {
     ]);
 
     orders.push(...(ordersData.orders || []));
-    returns.push(...(returnsData.returns || []));
+    const returnsList = returnsData.returns || [];
+    for (const r of returnsList) {
+      returns.push({ ...r, _campaignId: campaignId, _apiKey: apiKey });
+    }
     payouts.push(...(payoutsData.payouts || []));
   }
 
@@ -273,17 +327,59 @@ async function syncDay(projectId, date) {
     }
   }
 
-  returnsSum = sumMoney(returns, 'amount');
+  returnsSum = 0;
 
   for (const r of returns) {
-    const items = r.items || r.returnItems || [];
-    if (!Array.isArray(items)) continue;
-    for (const it of items) {
-      const sku = String(it.offerId || it.sku || 'unknown');
-      const qty = Number(it.count || it.quantity || 1);
-      const amount = Number(it.amount || it.price || it.refund || 0);
-      const total = amount * (qty || 1);
-      returnsBySku.set(sku, (returnsBySku.get(sku) || 0) + total);
+    let retAmount = extractReturnAmount(r);
+    let items = r.items || r.returnItems || r.itemsInfo || [];
+
+    // If amount missing, try to fetch return details
+    if ((!retAmount || retAmount === 0) && (r.orderId || r.order_id) && (r.id || r.returnId)) {
+      try {
+        const detail = await fetchReturnById(
+          r._campaignId || r.campaignId || r.campaign_id || r.campaignID || r.campaign || undefined,
+          r.orderId || r.order_id,
+          r.id || r.returnId,
+          r._apiKey || r.apiKey || r.api_key || r.apiKeyId || null,
+          requestOptions
+        );
+        const d = detail.result || detail;
+        retAmount = extractReturnAmount(d) || retAmount;
+        items = d.items || d.returnItems || d.itemsInfo || items;
+      } catch (e) {
+        // ignore detail errors
+      }
+    }
+
+    let itemSum = 0;
+    let totalQty = 0;
+    const itemRows = [];
+
+    if (Array.isArray(items)) {
+      for (const it of items) {
+        const sku = String(it.offerId || it.shopSku || it.sku || 'unknown');
+        const qty = Number(it.count || it.quantity || 1) || 0;
+        totalQty += qty;
+        const amount = extractItemReturnAmount(it);
+        if (amount) {
+          itemSum += amount;
+          returnsBySku.set(sku, (returnsBySku.get(sku) || 0) + amount);
+        } else {
+          itemRows.push({ sku, qty });
+        }
+      }
+    }
+
+    if (!retAmount && itemSum > 0) retAmount = itemSum;
+    returnsSum += retAmount;
+
+    // If item amounts missing, distribute by quantity
+    if (retAmount > 0 && itemRows.length && totalQty > 0) {
+      const perUnit = retAmount / totalQty;
+      for (const it of itemRows) {
+        const total = perUnit * it.qty;
+        returnsBySku.set(it.sku, (returnsBySku.get(it.sku) || 0) + total);
+      }
     }
   }
 

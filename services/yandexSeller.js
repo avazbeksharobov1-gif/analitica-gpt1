@@ -93,14 +93,33 @@ async function fetchReturnsByDate(dateFrom, dateTo, campaignId, apiKey, options 
   if (!campaignId) {
     throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
   }
-  return request(`/campaigns/${campaignId}/returns?fromDate=${dateFrom}&toDate=${dateTo}`, apiKey, options);
+  const params = new URLSearchParams();
+  params.set('fromDate', dateFrom);
+  params.set('toDate', dateTo);
+  if (options.returnType) params.set('type', options.returnType);
+  if (options.returnStatuses) params.set('statuses', options.returnStatuses);
+  const data = await request(`/campaigns/${campaignId}/returns?${params.toString()}`, apiKey, options);
+  const result = data.result || data;
+  return { returns: result.returns || [] };
 }
 
 async function fetchPayoutsByDate(dateFrom, dateTo, campaignId, apiKey, options = {}) {
   if (!campaignId) {
     throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
   }
-  return request(`/campaigns/${campaignId}/payouts?fromDate=${dateFrom}&toDate=${dateTo}`, apiKey, options);
+  const data = await request(`/campaigns/${campaignId}/payouts?fromDate=${dateFrom}&toDate=${dateTo}`, apiKey, options);
+  const result = data.result || data;
+  return { payouts: result.payouts || [] };
+}
+
+async function fetchReturnById(campaignId, orderId, returnId, apiKey, options = {}) {
+  if (!campaignId) {
+    throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
+  }
+  if (!orderId || !returnId) {
+    throw new Error('YANDEX_RETURN_ID missing');
+  }
+  return request(`/campaigns/${campaignId}/orders/${orderId}/returns/${returnId}`, apiKey, options);
 }
 
 async function fetchOfferMappingEntries(campaignId, apiKey, pageToken, options = {}) {
@@ -120,5 +139,6 @@ module.exports = {
   fetchOrdersByDate,
   fetchReturnsByDate,
   fetchPayoutsByDate,
+  fetchReturnById,
   fetchOfferMappingEntries
 };
