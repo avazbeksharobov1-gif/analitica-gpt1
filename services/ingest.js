@@ -56,14 +56,15 @@ function readMoney(val) {
   return 0;
 }
 
+function readMinorMoney(val) {
+  const n = Number(val);
+  return Number.isFinite(n) ? n / 100 : 0;
+}
+
 function extractReturnAmount(r) {
-  return (
-    readMoney(r?.refundAmount) ||
-    readMoney(r?.amount) ||
-    readMoney(r?.totalAmount) ||
-    readMoney(r?.price) ||
-    0
-  );
+  if (r?.amount !== undefined && r?.amount !== null) return readMoney(r.amount);
+  if (r?.refundAmount !== undefined && r?.refundAmount !== null) return readMinorMoney(r.refundAmount);
+  return readMoney(r?.totalAmount) || readMoney(r?.price) || 0;
 }
 
 function extractItemReturnAmount(it) {
@@ -72,13 +73,9 @@ function extractItemReturnAmount(it) {
     const sum = it.decisions.reduce((s, d) => s + readMoney(d?.amount), 0);
     if (sum) return sum;
   }
-  return (
-    readMoney(it.refundAmount) ||
-    readMoney(it.amount) ||
-    readMoney(it.totalAmount) ||
-    readMoney(it.price) ||
-    0
-  );
+  if (it.amount !== undefined && it.amount !== null) return readMoney(it.amount);
+  if (it.refundAmount !== undefined && it.refundAmount !== null) return readMinorMoney(it.refundAmount);
+  return readMoney(it.totalAmount) || readMoney(it.price) || 0;
 }
 
 function sumCommissions(list) {
