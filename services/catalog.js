@@ -4,20 +4,45 @@ const {
   getApiKeys,
   fetchOfferMappingEntries
 } = require('./yandexSeller');
+const { getSellerConfig } = require('./projectTokens');
 
 async function syncCatalog(projectId) {
-  const campaignIds = getCampaignIds();
-  const apiKeys = getApiKeys();
+  const config = await getSellerConfig(projectId);
+  const campaignIds = config?.campaignIds?.length ? config.campaignIds : getCampaignIds();
+  const apiKeys = config?.apiKeys?.length ? config.apiKeys : getApiKeys();
+  const tokenMap = config?.tokenMap?.length ? config.tokenMap : [];
+  const requestOptions = {
+    baseUrl: config?.baseUrl,
+    authMode: config?.authMode
+  };
   if (!campaignIds.length) throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
   if (!apiKeys.length) throw new Error('YANDEX_SELLER_API_KEY missing');
 
   const skuMap = new Map();
 
-  for (const apiKey of apiKeys) {
-    for (const campaignId of campaignIds) {
-      let pageToken = null;
-      do {
-        const data = await fetchOfferMappingEntries(campaignId, apiKey, pageToken);
+  const pairs = [];
+  if (tokenMap.length) {
+    for (const entry of tokenMap) {
+      const key = entry.key;
+      if (!key) continue;
+      const camps = entry.campaignIds && entry.campaignIds.length ? entry.campaignIds : campaignIds;
+      for (const campaignId of camps) {
+        pairs.push({ campaignId, apiKey: key });
+      }
+    }
+  } else {
+    for (const apiKey of apiKeys) {
+      for (const campaignId of campaignIds) {
+        pairs.push({ campaignId, apiKey });
+      }
+    }
+  }
+
+  for (const { apiKey, campaignId } of pairs) {
+    let pageToken = null;
+    do {
+      try {
+        const data = await fetchOfferMappingEntries(campaignId, apiKey, pageToken, requestOptions);
         const result = data.result || data;
         const entries = result.offerMappingEntries || result.offerMappings || [];
         for (const entry of entries) {
@@ -34,8 +59,11 @@ async function syncCatalog(projectId) {
           result.paging?.nextPageToken ||
           result.nextPageToken ||
           null;
-      } while (pageToken);
-    }
+      } catch (e) {
+        console.error('Yandex catalog error:', e.message);
+        pageToken = null;
+      }
+    } while (pageToken);
   }
 
   for (const [sku, name] of skuMap.entries()) {

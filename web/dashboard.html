@@ -3,227 +3,254 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Analitika Paneli</title>
+  <title>Analitica Dashboard</title>
   <link rel="stylesheet" href="/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script defer src="/main.js"></script>
 </head>
-<body>
-  <header class="topbar">
-    <div class="wrap topbar-grid">
+<body class="app">
+  <div class="app-shell">
+    <aside class="sidebar">
       <div class="brand">
         <span class="logo">A</span>
         <div>
-          <div class="title">Analitika</div>
+          <div class="title">Analitica</div>
           <div class="subtitle">Market analitika + AI</div>
         </div>
       </div>
 
-      <div class="range">
-        <button class="btn ghost active" data-range="7d">7 kun</button>
-        <button class="btn ghost" data-range="30d">30 kun</button>
-        <button class="btn ghost" data-range="today">Bugun</button>
-      </div>
+      <nav class="nav">
+        <a class="nav-item active" href="#dash">Dashboard</a>
+        <a class="nav-item" href="#products">Tovarlar</a>
+        <a class="nav-item" href="#expenses">Xarajatlar</a>
+        <a class="nav-item" href="#tokens">Integratsiya</a>
+        <a class="nav-item" href="#ai">AI tahlil</a>
+      </nav>
 
-      <div class="actions">
-        <select id="projectSelect" class="btn ghost"></select>
-        <button class="btn" id="refreshBtn">Yangilash</button>
-        <button class="btn ghost" id="syncRangeBtn">30 kunlik sync</button>
-        <a class="btn ghost" id="exportExcel" href="#">Excel</a>
-        <a class="btn ghost" id="exportPdf" href="#">PDF</a>
-        <button class="btn primary" id="aiBtn">AI yangilash</button>
+      <div class="sidebar-footer">
+        <div class="muted">Sana: <span id="lastUpdated">-</span></div>
       </div>
-    </div>
-  </header>
+    </aside>
 
-  <main class="wrap">
-    <section class="kpi-grid">
-      <div class="card">
-        <div class="kpi-label">Daromad</div>
-        <div class="kpi-value" id="kpi-revenue">0</div>
-        <div class="kpi-sub" id="kpi-range">Davr: 7 kun</div>
-      </div>
-      <div class="card">
-        <div class="kpi-label">Buyurtmalar</div>
-        <div class="kpi-value" id="kpi-orders">0</div>
-        <div class="kpi-sub">Jami buyurtma</div>
-      </div>
-      <div class="card">
-        <div class="kpi-label">Xarajat</div>
-        <div class="kpi-value danger" id="kpi-expenses">0</div>
-        <div class="kpi-sub">Komissiya + ekvayring + logistika + qaytarish + xarajat + COGS + soliq</div>
-      </div>
-      <div class="card">
-        <div class="kpi-label">Foyda</div>
-        <div class="kpi-value success" id="kpi-profit">0</div>
-        <div class="kpi-sub" id="kpi-margin">Marja: 0%</div>
-      </div>
-    </section>
+    <div class="app-main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1>Dashboard</h1>
+          <p class="muted">Kundalik va haftalik holat</p>
+        </div>
 
-    <section class="grid-2">
-      <div class="panel">
-        <div class="panel-header">
-          <h3>Tarif</h3>
-        </div>
-        <div class="compare" id="planInfo">Yuklanmoqda...</div>
-        <div class="actions" id="planActions"></div>
-      </div>
-    </section>
-
-    <section class="grid-2">
-      <div class="panel">
-        <div class="panel-header">
-          <h3>Kunlik daromad va foyda</h3>
-        </div>
-        <canvas id="dailyChart" height="120"></canvas>
-      </div>
-      <div class="panel">
-        <div class="panel-header">
-          <h3>30 kunlik prognoz</h3>
-          <span class="muted" id="lastUpdated">Yangilandi: -</span>
-        </div>
-        <canvas id="forecastChart" height="120"></canvas>
-      </div>
-      <div class="panel">
-        <div class="panel-header">
-          <h3>Xarajatlar taqsimoti</h3>
-        </div>
-        <div class="breakdown">
-          <div><span>Komissiya</span><b id="kpi-fees">0</b></div>
-          <div><span>Ekvayring</span><b id="kpi-acquiring">0</b></div>
-          <div><span>Logistika</span><b id="kpi-logistics">0</b></div>
-          <div><span>Qaytarish</span><b id="kpi-returns">0</b></div>
-          <div><span>Xarajat</span><b id="kpi-expenses-break">0</b></div>
-          <div><span>Soliq 1%</span><b id="kpi-tax1">0</b></div>
-          <div><span>Ijtimoiy soliq</span><b id="kpi-social-tax">0</b></div>
-          <div><span>COGS</span><b id="kpi-cogs">0</b></div>
-        </div>
-        <div class="compare" id="compareText">Yuklanmoqda...</div>
-      </div>
-    </section>
-
-    <section class="grid-2">
-      <div class="panel">
-        <div class="panel-header">
-          <h3>Xarajatlar (kategoriya)</h3>
-        </div>
-        <div class="breakdown" id="expenseSummary">
-          <div><span>Reklama</span><b>0</b></div>
-        </div>
-      </div>
-      <div class="panel">
-        <div class="panel-header">
-          <h3>Yangi xarajat</h3>
-        </div>
-        <form id="expenseForm">
-          <div class="breakdown">
-            <div>
-              <span>Kategoriya</span>
-              <select id="expenseCategory" class="btn ghost" style="width: 160px;"></select>
-            </div>
-            <div>
-              <span>Summa</span>
-              <input id="expenseAmount" class="btn ghost" type="number" min="0" step="1" />
-            </div>
-            <div>
-              <span>Izoh</span>
-              <input id="expenseNote" class="btn ghost" type="text" />
-            </div>
+        <div class="topbar-right">
+          <div class="range">
+            <button class="btn ghost active" data-range="7d">7 kun</button>
+            <button class="btn ghost" data-range="30d">30 kun</button>
+            <button class="btn ghost" data-range="today">Bugun</button>
           </div>
-          <button class="btn primary" type="submit">Saqlash</button>
-        </form>
-      </div>
-    </section>
 
-    <section class="grid-2">
-      <div class="panel">
-        <div class="panel-header">
-          <h3>Yandex tokenlar</h3>
-        </div>
-        <form id="tokenForm">
-          <div class="breakdown">
-            <div style="grid-column: 1 / -1;">
-              <span>API Keys (vergul bilan)</span>
-              <textarea id="tokenApiKeys" class="btn ghost" rows="2" style="width:100%"></textarea>
-            </div>
-            <div style="grid-column: 1 / -1;">
-              <span>Campaign IDs (vergul bilan)</span>
-              <input id="tokenCampaignIds" class="btn ghost" type="text" />
-            </div>
-            <div>
-              <span>Auth mode</span>
-              <select id="tokenAuthMode" class="btn ghost">
-                <option value="api-key">api-key</option>
-                <option value="bearer">bearer</option>
-              </select>
-            </div>
-            <div>
-              <span>Base URL</span>
-              <input id="tokenBaseUrl" class="btn ghost" type="text" />
-            </div>
-          </div>
-          <button class="btn primary" type="submit">Saqlash</button>
-          <div class="muted" id="tokenStatus"></div>
-        </form>
-      </div>
-    </section>
-
-    <section class="ai-section">
-      <div class="panel ai">
-        <div class="panel-header">
-          <h3>AI tahlil</h3>
-          <span class="muted" id="aiStatus">Kutilmoqda</span>
-        </div>
-        <div class="ai-grid">
-          <div class="ai-card" id="aiInsight">AI o'chirilgan</div>
-          <div class="ai-card" id="aiRecommend">AI o'chirilgan</div>
-          <div class="ai-card" id="aiAnomaly">AI o'chirilgan</div>
-          <div class="ai-card" id="aiProduct">AI o'chirilgan</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="table-section">
-      <div class="panel">
-        <div class="panel-header">
-          <h3>Tovarlar (SKU)</h3>
           <div class="actions">
-            <button class="btn ghost" id="syncSkuBtn">SKUlarni yangilash</button>
-            <span class="muted" id="productsCount">0 ta</span>
+            <select id="projectSelect" class="btn ghost"></select>
+            <button class="btn" id="refreshBtn">Yangilash</button>
+            <button class="btn ghost" id="syncRangeBtn">30 kunlik sync</button>
+            <a class="btn ghost" id="exportExcel" href="#">Excel</a>
+            <a class="btn ghost" id="exportPdf" href="#">PDF</a>
+            <button class="btn primary" id="aiBtn">AI yangilash</button>
           </div>
         </div>
-        <div class="panel-header">
-          <div>
-            <label class="muted" for="skuSelect">SKU grafik</label>
-            <select id="skuSelect" class="btn ghost"></select>
+      </header>
+
+      <main class="content">
+        <section class="kpi-grid" id="dash">
+          <div class="card">
+            <div class="kpi-label">Daromad</div>
+            <div class="kpi-value" id="kpi-revenue">0</div>
+            <div class="kpi-sub" id="kpi-range">Davr: 7 kun</div>
           </div>
-        </div>
-        <canvas id="skuChart" height="120"></canvas>
-        <div class="table-wrap">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>SKU</th>
-                <th>Nomi</th>
-                <th>Tannarx</th>
-                <th>Son</th>
-                <th>Daromad</th>
-                <th>Komissiya</th>
-                <th>Ekvayring</th>
-                <th>Logistika</th>
-                <th>Qaytarish</th>
-                <th>COGS</th>
-                <th>Foyda</th>
-                <th>Marja</th>
-              </tr>
-            </thead>
-            <tbody id="productTable">
-              <tr><td colspan="12">Yuklanmoqda...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-  </main>
+          <div class="card">
+            <div class="kpi-label">Buyurtmalar</div>
+            <div class="kpi-value" id="kpi-orders">0</div>
+            <div class="kpi-sub">Jami buyurtma</div>
+          </div>
+          <div class="card">
+            <div class="kpi-label">Xarajat</div>
+            <div class="kpi-value danger" id="kpi-expenses">0</div>
+            <div class="kpi-sub">Komissiya + ekvayring + logistika + qaytarish + xarajat + COGS + soliq</div>
+          </div>
+          <div class="card">
+            <div class="kpi-label">Foyda</div>
+            <div class="kpi-value success" id="kpi-profit">0</div>
+            <div class="kpi-sub" id="kpi-margin">Marja: 0%</div>
+          </div>
+        </section>
+
+        <section class="grid-2">
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Kunlik daromad va foyda</h3>
+            </div>
+            <canvas id="dailyChart" height="120"></canvas>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h3>30 kunlik prognoz</h3>
+              <span class="muted">Forecast</span>
+            </div>
+            <canvas id="forecastChart" height="120"></canvas>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Xarajatlar taqsimoti</h3>
+            </div>
+            <div class="breakdown">
+              <div><span>Komissiya</span><b id="kpi-fees">0</b></div>
+              <div><span>Ekvayring</span><b id="kpi-acquiring">0</b></div>
+              <div><span>Logistika</span><b id="kpi-logistics">0</b></div>
+              <div><span>Qaytarish</span><b id="kpi-returns">0</b></div>
+              <div><span>Xarajat</span><b id="kpi-expenses-break">0</b></div>
+              <div><span>Soliq 1%</span><b id="kpi-tax1">0</b></div>
+              <div><span>Ijtimoiy soliq</span><b id="kpi-social-tax">0</b></div>
+              <div><span>COGS</span><b id="kpi-cogs">0</b></div>
+            </div>
+            <div class="compare" id="compareText">Yuklanmoqda...</div>
+          </div>
+        </section>
+
+        <section class="grid-2">
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Tarif</h3>
+            </div>
+            <div class="compare" id="planInfo">Yuklanmoqda...</div>
+            <div class="actions" id="planActions"></div>
+          </div>
+        </section>
+
+        <section class="grid-2" id="expenses">
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Xarajatlar (kategoriya)</h3>
+            </div>
+            <div class="breakdown" id="expenseSummary">
+              <div><span>Reklama</span><b>0</b></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Yangi xarajat</h3>
+            </div>
+            <form id="expenseForm">
+              <div class="breakdown">
+                <div>
+                  <span>Kategoriya</span>
+                  <select id="expenseCategory" class="btn ghost" style="width: 160px;"></select>
+                </div>
+                <div>
+                  <span>Summa</span>
+                  <input id="expenseAmount" class="btn ghost" type="number" min="0" step="1" />
+                </div>
+                <div>
+                  <span>Izoh</span>
+                  <input id="expenseNote" class="btn ghost" type="text" />
+                </div>
+              </div>
+              <button class="btn primary" type="submit">Saqlash</button>
+            </form>
+          </div>
+        </section>
+
+        <section class="grid-2" id="tokens">
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Yandex tokenlar</h3>
+            </div>
+            <form id="tokenForm">
+              <div class="breakdown">
+                <div style="grid-column: 1 / -1;">
+                  <span>API Keys (vergul bilan)</span>
+                  <textarea id="tokenApiKeys" class="btn ghost" rows="2" style="width:100%"></textarea>
+                  <div class="muted">
+                    Agar tokenlar turli kampaniyalarga tegishli bo‘lsa, JSON формат ҳам қўлланади:
+                    [{"key":"TOKEN1","campaignIds":["144","146"]},{"key":"TOKEN2","campaignIds":["148"]}]
+                  </div>
+                </div>
+                <div style="grid-column: 1 / -1;">
+                  <span>Campaign IDs (vergul bilan)</span>
+                  <input id="tokenCampaignIds" class="btn ghost" type="text" />
+                </div>
+                <div>
+                  <span>Auth mode</span>
+                  <select id="tokenAuthMode" class="btn ghost">
+                    <option value="api-key">api-key</option>
+                    <option value="bearer">bearer</option>
+                  </select>
+                </div>
+                <div>
+                  <span>Base URL</span>
+                  <input id="tokenBaseUrl" class="btn ghost" type="text" />
+                </div>
+              </div>
+              <button class="btn primary" type="submit">Saqlash</button>
+              <div class="muted" id="tokenStatus"></div>
+            </form>
+          </div>
+        </section>
+
+        <section class="ai-section" id="ai">
+          <div class="panel ai">
+            <div class="panel-header">
+              <h3>AI tahlil</h3>
+              <span class="muted" id="aiStatus">Kutilmoqda</span>
+            </div>
+            <div class="ai-grid">
+              <div class="ai-card" id="aiInsight">AI o'chirilgan</div>
+              <div class="ai-card" id="aiRecommend">AI o'chirilgan</div>
+              <div class="ai-card" id="aiAnomaly">AI o'chirilgan</div>
+              <div class="ai-card" id="aiProduct">AI o'chirilgan</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="table-section" id="products">
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Tovarlar (SKU)</h3>
+              <div class="actions">
+                <button class="btn ghost" id="syncSkuBtn">SKUlarni yangilash</button>
+                <span class="muted" id="productsCount">0 ta</span>
+              </div>
+            </div>
+            <div class="panel-header">
+              <div>
+                <label class="muted" for="skuSelect">SKU grafik</label>
+                <select id="skuSelect" class="btn ghost"></select>
+              </div>
+            </div>
+            <canvas id="skuChart" height="120"></canvas>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Nomi</th>
+                    <th>Tannarx</th>
+                    <th>Son</th>
+                    <th>Daromad</th>
+                    <th>Komissiya</th>
+                    <th>Ekvayring</th>
+                    <th>Logistika</th>
+                    <th>Qaytarish</th>
+                    <th>COGS</th>
+                    <th>Foyda</th>
+                    <th>Marja</th>
+                  </tr>
+                </thead>
+                <tbody id="productTable">
+                  <tr><td colspan="12">Yuklanmoqda...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
 </body>
 </html>

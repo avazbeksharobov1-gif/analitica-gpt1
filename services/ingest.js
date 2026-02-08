@@ -6,6 +6,7 @@ const {
   getCampaignIds,
   getApiKeys
 } = require('./yandexSeller');
+const { getSellerConfig } = require('./projectTokens');
 const ACQUIRING_RATE = Number(process.env.ACQUIRING_RATE || 0.01);
 const SKIP_PAYOUTS = process.env.SKIP_PAYOUTS === 'true';
 
@@ -39,8 +40,14 @@ async function syncDay(projectId, date) {
 
   const errors = {};
 
-  const campaignIds = getCampaignIds();
-  const apiKeys = getApiKeys();
+  const config = await getSellerConfig(projectId);
+  const campaignIds = config?.campaignIds?.length ? config.campaignIds : getCampaignIds();
+  const apiKeys = config?.apiKeys?.length ? config.apiKeys : getApiKeys();
+  const tokenMap = config?.tokenMap?.length ? config.tokenMap : [];
+  const requestOptions = {
+    baseUrl: config?.baseUrl,
+    authMode: config?.authMode
+  };
   if (!campaignIds.length) {
     throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
   }
@@ -52,37 +59,53 @@ async function syncDay(projectId, date) {
   const returns = [];
   const payouts = [];
 
-  for (const apiKey of apiKeys) {
-    for (const campaignId of campaignIds) {
-      const [ordersData, returnsData, payoutsData] = await Promise.all([
-        fetchOrdersByDate(dateStr, dateStr, campaignId, apiKey).catch((e) => {
-          errors[`${campaignId}:orders`] = e.message || String(e);
-          console.error('Yandex orders error:', e.message);
-          return { orders: [] };
-        }),
-        fetchReturnsByDate(dateStr, dateStr, campaignId, apiKey).catch((e) => {
-          errors[`${campaignId}:returns`] = e.message || String(e);
-          console.error('Yandex returns error:', e.message);
-          return { returns: [] };
-        }),
-        SKIP_PAYOUTS
-          ? Promise.resolve({ payouts: [] })
-          : fetchPayoutsByDate(dateStr, dateStr, campaignId, apiKey).catch((e) => {
-              const msg = e.message || String(e);
-              if (!msg.includes('404') && !msg.includes('NOT_FOUND')) {
-                errors[`${campaignId}:payouts`] = msg;
-                console.error('Yandex payouts error:', msg);
-              } else {
-                console.warn('Yandex payouts not available, skipping');
-              }
-              return { payouts: [] };
-            })
-      ]);
-
-      orders.push(...(ordersData.orders || []));
-      returns.push(...(returnsData.returns || []));
-      payouts.push(...(payoutsData.payouts || []));
+  const pairs = [];
+  if (tokenMap.length) {
+    for (const entry of tokenMap) {
+      const key = entry.key;
+      if (!key) continue;
+      const camps = entry.campaignIds && entry.campaignIds.length ? entry.campaignIds : campaignIds;
+      for (const campaignId of camps) {
+        pairs.push({ campaignId, apiKey: key });
+      }
     }
+  } else {
+    for (const apiKey of apiKeys) {
+      for (const campaignId of campaignIds) {
+        pairs.push({ campaignId, apiKey });
+      }
+    }
+  }
+
+  for (const { apiKey, campaignId } of pairs) {
+    const [ordersData, returnsData, payoutsData] = await Promise.all([
+      fetchOrdersByDate(dateStr, dateStr, campaignId, apiKey, requestOptions).catch((e) => {
+        errors[`${campaignId}:orders`] = e.message || String(e);
+        console.error('Yandex orders error:', e.message);
+        return { orders: [] };
+      }),
+      fetchReturnsByDate(dateStr, dateStr, campaignId, apiKey, requestOptions).catch((e) => {
+        errors[`${campaignId}:returns`] = e.message || String(e);
+        console.error('Yandex returns error:', e.message);
+        return { returns: [] };
+      }),
+      SKIP_PAYOUTS
+        ? Promise.resolve({ payouts: [] })
+        : fetchPayoutsByDate(dateStr, dateStr, campaignId, apiKey, requestOptions).catch((e) => {
+            const msg = e.message || String(e);
+            if (!msg.includes('404') && !msg.includes('NOT_FOUND')) {
+              errors[`${campaignId}:payouts`] = msg;
+              console.error('Yandex payouts error:', msg);
+            } else {
+              console.warn('Yandex payouts not available, skipping');
+            }
+            return { payouts: [] };
+          })
+    ]);
+
+    orders.push(...(ordersData.orders || []));
+    returns.push(...(returnsData.returns || []));
+    payouts.push(...(payoutsData.payouts || []));
   }
 
   let revenue = 0;
