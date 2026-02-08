@@ -367,11 +367,11 @@ async function syncDay(projectId, date) {
       }
     }
 
-    if (!retAmount && itemSum > 0) retAmount = itemSum;
+    if (itemSum > 0) retAmount = itemSum;
     returnsSum += retAmount;
 
     // If item amounts missing, distribute by quantity
-    if (retAmount > 0 && itemRows.length && totalQty > 0) {
+    if (retAmount > 0 && itemRows.length && totalQty > 0 && itemSum === 0) {
       const perUnit = retAmount / totalQty;
       for (const it of itemRows) {
         const total = perUnit * it.qty;
