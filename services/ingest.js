@@ -17,6 +17,7 @@ function parseEnvNumber(value, fallback) {
 
 const ACQUIRING_RATE = parseEnvNumber(process.env.ACQUIRING_RATE, 0.01);
 const SKIP_PAYOUTS = process.env.SKIP_PAYOUTS === 'true';
+const RETURNS_DEBUG = process.env.RETURNS_DEBUG === 'true';
 
 function toDateOnly(d) {
   const dt = new Date(d);
@@ -226,6 +227,32 @@ async function syncDay(projectId, date) {
       returns.push({ ...r, _campaignId: campaignId, _apiKey: apiKey });
     }
     payouts.push(...(payoutsData.payouts || []));
+
+    if (RETURNS_DEBUG && returnsList.length) {
+      const sample = returnsList.slice(0, 3).map((r) => {
+        const items = r.items || r.returnItems || r.itemsInfo || [];
+        const first = Array.isArray(items) && items.length ? items[0] : null;
+        return {
+          id: r.id || r.returnId || r.return_id,
+          orderId: r.orderId || r.order_id || r.order?.id || r.order?.orderId,
+          type: r.type,
+          status: r.status,
+          amount: r.amount,
+          refundAmount: r.refundAmount,
+          totalAmount: r.totalAmount,
+          itemsCount: Array.isArray(items) ? items.length : 0,
+          firstItem: first
+            ? {
+                sku: first.offerId || first.shopSku || first.sku,
+                amount: first.amount,
+                refundAmount: first.refundAmount,
+                totalAmount: first.totalAmount
+              }
+            : null
+        };
+      });
+      console.log(`Returns sample (${campaignId}):`, JSON.stringify(sample));
+    }
   }
 
   let revenue = 0;
@@ -331,12 +358,16 @@ async function syncDay(projectId, date) {
     let items = r.items || r.returnItems || r.itemsInfo || [];
 
     // If amount missing, try to fetch return details
-    if ((!retAmount || retAmount === 0) && (r.orderId || r.order_id) && (r.id || r.returnId)) {
+    const orderId =
+      r.orderId || r.order_id || r.order?.id || r.order?.orderId || r.order?.order_id;
+    const returnId = r.id || r.returnId || r.return_id || r.return?.id || r.return?.returnId;
+
+    if ((!retAmount || retAmount === 0) && orderId && returnId) {
       try {
         const detail = await fetchReturnById(
           r._campaignId || r.campaignId || r.campaign_id || r.campaignID || r.campaign || undefined,
-          r.orderId || r.order_id,
-          r.id || r.returnId,
+          orderId,
+          returnId,
           r._apiKey || r.apiKey || r.api_key || r.apiKeyId || null,
           requestOptions
         );
