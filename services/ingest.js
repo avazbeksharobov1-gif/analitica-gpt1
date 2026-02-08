@@ -32,8 +32,8 @@ function sumMoney(items, field) {
 function pickNumber(obj, keys) {
   for (const k of keys) {
     if (obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== '') {
-      const n = Number(obj[k]);
-      if (!Number.isNaN(n)) return n;
+      const n = readMoney(obj[k]);
+      if (Number.isFinite(n)) return n;
     }
   }
   return 0;
@@ -124,11 +124,14 @@ function sumCommissions(list) {
 
   for (const c of list) {
     const type = c?.type || c?.service || c?.name || '';
-    const amount =
-      Number(c?.actual) ||
-      Number(c?.amount) ||
-      Number(c?.value) ||
-      0;
+    const amount = readMoney(
+      c?.actual ??
+        c?.amount ??
+        c?.value ??
+        c?.price ??
+        c?.sum ??
+        0
+    );
     if (!amount) continue;
 
     const bucket = classifyCharge(type);
@@ -368,6 +371,8 @@ async function syncDay(projectId, date) {
 
   const itemAgg = new Map();
   const returnsBySku = new Map();
+  const returnsByOrder = new Map();
+  const orderRevenueMap = new Map();
 
   for (const o of orders) {
     ordersCount += 1;
@@ -391,8 +396,23 @@ async function syncDay(projectId, date) {
     const hasCommissions =
       commissionSplit.fees + commissionSplit.acquiring + commissionSplit.logistics > 0;
 
-    let orderFees = pickNumber(o, ['fee', 'fees', 'marketplaceFee', 'commission']);
-    let orderLogistics = pickNumber(o, ['delivery', 'logistics', 'shipping', 'shipment']);
+    let orderFees = pickNumber(o, [
+      'fee',
+      'fees',
+      'marketplaceFee',
+      'commission',
+      'commissionFee',
+      'marketplaceCommission'
+    ]);
+    let orderLogistics = pickNumber(o, [
+      'delivery',
+      'deliveryCost',
+      'deliveryServiceCost',
+      'logistics',
+      'shipping',
+      'shipment',
+      'shipmentCost'
+    ]);
     let orderAcquiring = pickNumber(o, [
       'acquiring',
       'acquiringFee',
@@ -419,6 +439,10 @@ async function syncDay(projectId, date) {
     fees += orderFees;
     logistics += orderLogistics;
     acquiring += orderAcquiring;
+    const orderId = o.id || o.orderId || o.order_id;
+    if (orderId && orderRevenue > 0) {
+      orderRevenueMap.set(String(orderId), orderRevenue);
+    }
     if (Array.isArray(o.items)) {
       for (const it of o.items) {
         const sku = String(it.offerId || it.shopSku || it.sku || 'unknown');
@@ -435,8 +459,20 @@ async function syncDay(projectId, date) {
         prev.quantity += qty;
         prev.revenue += itemRevenue;
 
-        const itemFees = pickNumber(it, ['fee', 'fees', 'commission', 'marketplaceFee']);
-        const itemLogistics = pickNumber(it, ['delivery', 'logistics', 'shipping']);
+        const itemFees = pickNumber(it, [
+          'fee',
+          'fees',
+          'commission',
+          'marketplaceFee',
+          'commissionFee'
+        ]);
+        const itemLogistics = pickNumber(it, [
+          'delivery',
+          'deliveryCost',
+          'logistics',
+          'shipping',
+          'shipment'
+        ]);
         const itemAcquiring = pickNumber(it, [
           'acquiring',
           'acquiringFee',
@@ -501,6 +537,10 @@ async function syncDay(projectId, date) {
 
     if (itemSum > 0) retAmount = itemSum;
     returnsSum += retAmount;
+    if (orderId) {
+      const key = String(orderId);
+      returnsByOrder.set(key, (returnsByOrder.get(key) || 0) + retAmount);
+    }
 
     // If item amounts missing, distribute by quantity
     if (retAmount > 0 && itemRows.length && totalQty > 0 && itemSum === 0) {
@@ -525,6 +565,19 @@ async function syncDay(projectId, date) {
       prev.returns += total;
       itemAgg.set(sku, prev);
     }
+  }
+
+  if (ordersDelivered > 0 && returnsByOrder.size) {
+    let deliveredNet = ordersDelivered;
+    for (const [oid, retAmount] of returnsByOrder.entries()) {
+      const orderRevenue = orderRevenueMap.get(oid) || 0;
+      if (!orderRevenue) continue;
+      if (retAmount >= orderRevenue * 0.9) {
+        deliveredNet -= 1;
+      }
+    }
+    if (deliveredNet < 0) deliveredNet = 0;
+    ordersDelivered = deliveredNet;
   }
 
   const payoutAcquiring = sumByKeys(payouts, [
