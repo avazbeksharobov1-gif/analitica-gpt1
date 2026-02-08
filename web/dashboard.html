@@ -23,7 +23,6 @@
         <a class="nav-item active" href="#dash">Dashboard</a>
         <a class="nav-item" href="#products">Tovarlar</a>
         <a class="nav-item" href="#expenses">Xarajatlar</a>
-        <a class="nav-item" href="#tokens">Integratsiya</a>
         <a class="nav-item" href="#ai">AI tahlil</a>
       </nav>
 
@@ -152,43 +151,6 @@
                 </div>
               </div>
               <button class="btn primary" type="submit">Saqlash</button>
-            </form>
-          </div>
-        </section>
-
-        <section class="grid-2" id="tokens">
-          <div class="panel">
-            <div class="panel-header">
-              <h3>Yandex tokenlar</h3>
-            </div>
-            <form id="tokenForm">
-              <div class="breakdown">
-                <div style="grid-column: 1 / -1;">
-                  <span>API Keys (vergul bilan)</span>
-                  <textarea id="tokenApiKeys" class="btn ghost" rows="2" style="width:100%"></textarea>
-                  <div class="muted">
-                    Agar tokenlar turli kampaniyalarga tegishli bo‘lsa, JSON формат ҳам қўлланади:
-                    [{"key":"TOKEN1","campaignIds":["144","146"]},{"key":"TOKEN2","campaignIds":["148"]}]
-                  </div>
-                </div>
-                <div style="grid-column: 1 / -1;">
-                  <span>Campaign IDs (vergul bilan)</span>
-                  <input id="tokenCampaignIds" class="btn ghost" type="text" />
-                </div>
-                <div>
-                  <span>Auth mode</span>
-                  <select id="tokenAuthMode" class="btn ghost">
-                    <option value="api-key">api-key</option>
-                    <option value="bearer">bearer</option>
-                  </select>
-                </div>
-                <div>
-                  <span>Base URL</span>
-                  <input id="tokenBaseUrl" class="btn ghost" type="text" />
-                </div>
-              </div>
-              <button class="btn primary" type="submit">Saqlash</button>
-              <div class="muted" id="tokenStatus"></div>
             </form>
           </div>
         </section>

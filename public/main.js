@@ -560,4 +560,3 @@ setupActions();
 loadAll();
 loadAI();
 loadExpenseCategories();
-loadTokenConfig();
