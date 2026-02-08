@@ -229,12 +229,11 @@ async function syncDay(projectId, date) {
       orderAcquiring = commissionSplit.acquiring;
     }
 
-    if (!orderAcquiring && ACQUIRING_RATE > 0) {
-      orderAcquiring = orderRevenue * ACQUIRING_RATE;
-    }
-
     if ((!orderRevenue || orderRevenue === 0) && Array.isArray(o.items)) {
       orderRevenue = o.items.reduce((sum, it) => sum + getItemRevenue(it), 0);
+    }
+    if (!orderAcquiring && ACQUIRING_RATE > 0 && orderRevenue > 0) {
+      orderAcquiring = orderRevenue * ACQUIRING_RATE;
     }
 
     revenue += orderRevenue;
