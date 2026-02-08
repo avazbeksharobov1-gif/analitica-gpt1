@@ -1,4 +1,4 @@
-const {
+﻿const {
   getKpi,
   getCompareStats,
   getForecastCompare,
@@ -17,6 +17,13 @@ const AI_DISABLED = process.env.DISABLE_AI === 'true';
 const BASE_URL =
   process.env.WEBHOOK_URL ||
   (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '');
+const DASHBOARD_URL = process.env.DASHBOARD_URL || process.env.PUBLIC_BASE_URL || BASE_URL;
+
+const BUTTON_DASHBOARD = 'Dashboard';
+const BUTTON_SYNC = 'Sync';
+const BUTTON_EXPENSE = 'Xarajat';
+const BUTTON_REPORT = 'Report';
+const BUTTON_SETTINGS = 'Sozlamalar';
 
 const projectByChat = new Map();
 const expenseFlow = new Map();
@@ -64,6 +71,10 @@ function chunk(arr, size) {
 
 async function showExpenseCategories(ctx) {
   const list = await prisma.expenseCategory.findMany({ orderBy: { id: 'asc' } });
+  if (!list.length) {
+    await ctx.reply('Kategoriya topilmadi. Format: xarajat svet 150000', Markup.removeKeyboard());
+    return;
+  }
   const buttons = list.map((c) => c.name);
   const rows = chunk(buttons, 2).map((row) => row.map((t) => Markup.button.text(t)));
   await ctx.reply('Kategoriya tanlang', Markup.keyboard(rows).oneTime().resize());
@@ -76,53 +87,132 @@ async function startExpenseFlow(ctx) {
 }
 
 async function sendDashboard(ctx) {
-  if (!BASE_URL) {
+  if (!DASHBOARD_URL) {
     return ctx.reply('Dashboard URL topilmadi. Railway domainni tekshiring.');
   }
   return ctx.reply(
     'Dashboard:',
-    Markup.inlineKeyboard([Markup.button.url('Dashboard', `${BASE_URL}/dashboard`)])
+    Markup.inlineKeyboard([Markup.button.url('Dashboard', `${DASHBOARD_URL}/dashboard`)])
   );
+}
+
+function mainMenu() {
+  return Markup.keyboard([
+    [BUTTON_DASHBOARD, BUTTON_SYNC, BUTTON_EXPENSE],
+    [BUTTON_REPORT, BUTTON_SETTINGS]
+  ]).resize();
+}
+
+function sendMainMenu(ctx, text) {
+  return ctx.reply(text || 'Menu', mainMenu());
+}
+
+async function sendReport(ctx, days) {
+  const projectId = getProjectId(ctx);
+  let period = Number(days || 7);
+  if (Number.isNaN(period) || period < 1) period = 7;
+  if (period > 90) period = 90;
+
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - (period - 1));
+
+  const [stats, project, series] = await Promise.all([
+    getKpi(projectId, from, to),
+    prisma.project.findUnique({ where: { id: projectId } }),
+    getDailySeries(projectId, from, to)
+  ]);
+
+  let chartImage = null;
+  try {
+    const labels = series.map(r => r.date);
+    const revenue = series.map(r => r.revenue || 0);
+    const profit = series.map(r => r.profit || 0);
+
+    const qc = new QuickChart();
+    qc.setConfig({
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Revenue', data: revenue, borderColor: '#2563eb', fill: false },
+          { label: 'Profit', data: profit, borderColor: '#16a34a', fill: false }
+        ]
+      }
+    });
+    qc.setWidth(800);
+    qc.setHeight(400);
+    qc.setBackgroundColor('white');
+    chartImage = await qc.toBinary();
+  } catch (e) {
+    chartImage = null;
+  }
+
+  const buffer = await generatePDFBuffer(stats, {
+    range: { from, to },
+    projectName: project ? project.name : null,
+    chartImage
+  });
+
+  const name = `report-${from.toISOString().slice(0, 10)}-${to
+    .toISOString()
+    .slice(0, 10)}.pdf`;
+  await ctx.replyWithDocument({ source: buffer, filename: name });
+}
+
+async function syncToday(ctx) {
+  try {
+    const projectId = getProjectId(ctx);
+    const date = new Date();
+    await syncDay(projectId, date);
+    ctx.reply(`Synced ${date.toISOString().slice(0, 10)}`);
+  } catch (e) {
+    ctx.reply('Sync failed');
+  }
 }
 
 function setupCommands(bot) {
   bot.start(async (ctx) => {
     const p = await getOrCreateProject();
     projectByChat.set(String(ctx.chat.id), p.id);
-    ctx.reply(
+    sendMainMenu(
+      ctx,
       'Analitica Bot\n\n' +
         '/dashboard - Dashboard link\n' +
-        '/stats - Daily KPI\n' +
-        '/month - 30 day KPI\n' +
-        '/compare - Week compare\n' +
-        '/forecast - 30 day forecast\n' +
+        '/stats - Kunlik KPI\n' +
+        '/month - 30 kun KPI\n' +
+        '/compare - Hafta taqqoslash\n' +
+        '/forecast - 30 kun prognoz\n' +
         '/report [days] - PDF report (default 7)\n' +
         '/harajat - xarajat kiritish (tugma)\n' +
         '/insight - AI insight\n' +
-        '/recommend - AI recommendations\n' +
+        '/recommend - AI tavsiya\n' +
         '/sync [YYYY-MM-DD] - Sync seller data\n' +
         '/projects - Project list\n' +
         '/project <id> - Select project\n' +
         '/alerts on|off - Profit drop alerts\n' +
         '/cancel - bekor qilish\n' +
-        'Expense format: expense svet 150000',
-      Markup.keyboard([
-        ['📊 Dashboard', '💸 Xarajat'],
-        ['📄 Report']
-      ]).resize()
+        'Expense format: xarajat svet 150000'
     );
   });
 
+  bot.command('menu', (ctx) => sendMainMenu(ctx, 'Menu'));
+
   bot.command('dashboard', sendDashboard);
-  bot.hears(/dashboard|dash|panel|панел|дашборд|📊/i, sendDashboard);
-  bot.hears(/^(💸\s*)?(xarajat|harajat)$/i, startExpenseFlow);
+  bot.hears(/dashboard|dash|panel/i, sendDashboard);
+  bot.hears(BUTTON_DASHBOARD, sendDashboard);
+  bot.hears(BUTTON_SYNC, syncToday);
+  bot.hears(BUTTON_EXPENSE, startExpenseFlow);
+  bot.hears(BUTTON_REPORT, async (ctx) => sendReport(ctx, 7));
+  bot.hears(BUTTON_SETTINGS, (ctx) => ctx.reply('Sozlamalar: /project, /alerts'));
+  bot.hears(/^(xarajat|harajat)$/i, startExpenseFlow);
 
   bot.command(['harajat', 'xarajat'], startExpenseFlow);
 
   bot.command('cancel', async (ctx) => {
     const chatId = String(ctx.chat.id);
     expenseFlow.delete(chatId);
-    ctx.reply('Bekor qilindi', Markup.removeKeyboard());
+    sendMainMenu(ctx, 'Bekor qilindi');
   });
 
   bot.command('project', async (ctx) => {
@@ -203,57 +293,9 @@ function setupCommands(bot) {
 
   bot.command('report', async (ctx) => {
     try {
-      const projectId = getProjectId(ctx);
       const parts = ctx.message.text.trim().split(/\s+/);
-      let days = parts[1] ? Number(parts[1]) : 7;
-      if (Number.isNaN(days) || days < 1) days = 7;
-      if (days > 90) days = 90;
-
-      const to = new Date();
-      const from = new Date();
-      from.setDate(from.getDate() - (days - 1));
-
-      const [stats, project, series] = await Promise.all([
-        getKpi(projectId, from, to),
-        prisma.project.findUnique({ where: { id: projectId } }),
-        getDailySeries(projectId, from, to)
-      ]);
-
-      let chartImage = null;
-      try {
-        const labels = series.map(r => r.date);
-        const revenue = series.map(r => r.revenue || 0);
-        const profit = series.map(r => r.profit || 0);
-
-        const qc = new QuickChart();
-        qc.setConfig({
-          type: 'line',
-          data: {
-            labels,
-            datasets: [
-              { label: 'Revenue', data: revenue, borderColor: '#2563eb', fill: false },
-              { label: 'Profit', data: profit, borderColor: '#16a34a', fill: false }
-            ]
-          }
-        });
-        qc.setWidth(800);
-        qc.setHeight(400);
-        qc.setBackgroundColor('white');
-        chartImage = await qc.toBinary();
-      } catch (e) {
-        chartImage = null;
-      }
-
-      const buffer = await generatePDFBuffer(stats, {
-        range: { from, to },
-        projectName: project ? project.name : null,
-        chartImage
-      });
-
-      const name = `report-${from.toISOString().slice(0, 10)}-${to
-        .toISOString()
-        .slice(0, 10)}.pdf`;
-      await ctx.replyWithDocument({ source: buffer, filename: name });
+      const days = parts[1] ? Number(parts[1]) : 7;
+      await sendReport(ctx, days);
     } catch (e) {
       ctx.reply('Report failed');
     }
@@ -275,7 +317,7 @@ function setupCommands(bot) {
   });
 
   bot.command('insight', async (ctx) => {
-    if (AI_DISABLED) return ctx.reply('AI vaqtincha o‘chirildi');
+    if (AI_DISABLED) return ctx.reply('AI vaqtincha ochirilgan');
     const projectId = getProjectId(ctx);
     const { thisWeek, lastWeek } = await getCompareStats(projectId);
     const text = await aiInsight(lastWeek.revenue, thisWeek.revenue);
@@ -284,11 +326,11 @@ function setupCommands(bot) {
 
   bot.command('recommend', async (ctx) => {
     try {
-      if (AI_DISABLED) return ctx.reply('AI vaqtincha o‘chirildi');
+      if (AI_DISABLED) return ctx.reply('AI vaqtincha ochirilgan');
       const projectId = getProjectId(ctx);
       const today = new Date();
       const text = await aiRecommend(await getKpi(projectId, today, today));
-      ctx.reply(`AI recommendations\n\n${text}`);
+      ctx.reply(`AI tavsiya\n\n${text}`);
     } catch (e) {
       ctx.reply('AI not available');
     }
@@ -312,7 +354,7 @@ function setupCommands(bot) {
     ctx.reply(on ? 'Alerts enabled' : 'Alerts disabled');
   });
 
-  bot.hears(/^(expense|harajat|харжат)\s+/i, async (ctx) => {
+  bot.hears(/^(expense|harajat)\s+/i, async (ctx) => {
     try {
       const projectId = getProjectId(ctx);
       const parsed = parseExpense(ctx.message.text);
@@ -355,9 +397,11 @@ function setupCommands(bot) {
       const note = parts.slice(1).join(' ') || null;
       await addExpense(state.projectId, state.categoryCode, amount, note);
       expenseFlow.delete(chatId);
-      return ctx.reply("Xarajat qo'shildi ✅");
+      return sendMainMenu(ctx, "Xarajat qo'shildi");
     }
   });
 }
 
 module.exports = setupCommands;
+
+
