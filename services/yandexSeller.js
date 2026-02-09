@@ -6,19 +6,20 @@ const CAMPAIGN_ID = process.env.YANDEX_SELLER_CAMPAIGN_ID;
 const BUSINESS_ID = process.env.YANDEX_BUSINESS_ID || process.env.YANDEX_SELLER_BUSINESS_ID;
 const AUTH_MODE = (process.env.YANDEX_SELLER_AUTH_MODE || 'api-key').toLowerCase();
 
+function normalizeIds(list = []) {
+  return list
+    .flatMap((v) => String(v || '').split(/[,\s;]+/))
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
 function getCampaignIds() {
   const fromIds = process.env.YANDEX_SELLER_CAMPAIGN_IDS;
   if (fromIds) {
-    return fromIds
-      .split(/[,\s;]+/)
-      .map((v) => v.trim())
-      .filter(Boolean);
+    return normalizeIds([fromIds]);
   }
   if (CAMPAIGN_ID) {
-    return CAMPAIGN_ID
-      .split(/[,\s;]+/)
-      .map((v) => v.trim())
-      .filter(Boolean);
+    return normalizeIds([CAMPAIGN_ID]);
   }
   return [];
 }
@@ -69,15 +70,27 @@ async function request(path, apiKey, options = {}) {
 }
 
 async function fetchOrdersByDate(dateFrom, dateTo, campaignId, apiKey, options = {}) {
-  if (!campaignId) {
+  const ids = normalizeIds([campaignId]);
+  if (!ids.length) {
     throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
   }
+
+  // Agar tasodifan vergul bilan birlashtirilgan bo'lsa, har birini alohida yuboramiz
+  if (ids.length > 1) {
+    const all = [];
+    for (const id of ids) {
+      const part = await fetchOrdersByDate(dateFrom, dateTo, id, apiKey, options);
+      all.push(...(part.orders || []));
+    }
+    return { orders: all };
+  }
+  const singleId = ids[0];
 
   const orders = [];
   let pageToken = null;
   do {
     const params = pageToken ? `?page_token=${encodeURIComponent(pageToken)}` : '';
-    const data = await request(`/campaigns/${campaignId}/stats/orders${params}`, apiKey, {
+    const data = await request(`/campaigns/${singleId}/stats/orders${params}`, apiKey, {
       ...options,
       method: 'POST',
       body: JSON.stringify({ dateFrom, dateTo })
@@ -91,9 +104,20 @@ async function fetchOrdersByDate(dateFrom, dateTo, campaignId, apiKey, options =
 }
 
 async function fetchOrdersList(dateFrom, dateTo, campaignId, apiKey, options = {}) {
-  if (!campaignId) {
+  const ids = normalizeIds([campaignId]);
+  if (!ids.length) {
     throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
   }
+
+  if (ids.length > 1) {
+    const all = [];
+    for (const id of ids) {
+      const part = await fetchOrdersList(dateFrom, dateTo, id, apiKey, options);
+      all.push(...(part.orders || []));
+    }
+    return { orders: all };
+  }
+  const singleId = ids[0];
 
   const orders = [];
   let pageToken = null;
@@ -103,7 +127,7 @@ async function fetchOrdersList(dateFrom, dateTo, campaignId, apiKey, options = {
     params.set('toDate', dateTo);
     params.set('limit', '50');
     if (pageToken) params.set('page_token', pageToken);
-    const data = await request(`/campaigns/${campaignId}/orders?${params.toString()}`, apiKey, options);
+    const data = await request(`/campaigns/${singleId}/orders?${params.toString()}`, apiKey, options);
     const result = data.result || data;
     orders.push(...(result.orders || []));
     pageToken = result.paging?.nextPageToken || result.nextPageToken || null;
@@ -148,24 +172,44 @@ async function fetchBusinessOrders(dateFrom, dateTo, businessId, apiKey, options
 }
 
 async function fetchReturnsByDate(dateFrom, dateTo, campaignId, apiKey, options = {}) {
-  if (!campaignId) {
+  const ids = normalizeIds([campaignId]);
+  if (!ids.length) {
     throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
   }
+  if (ids.length > 1) {
+    const all = [];
+    for (const id of ids) {
+      const part = await fetchReturnsByDate(dateFrom, dateTo, id, apiKey, options);
+      all.push(...(part.returns || []));
+    }
+    return { returns: all };
+  }
+  const singleId = ids[0];
   const params = new URLSearchParams();
   params.set('fromDate', dateFrom);
   params.set('toDate', dateTo);
   if (options.returnType) params.set('type', options.returnType);
   if (options.returnStatuses) params.set('statuses', options.returnStatuses);
-  const data = await request(`/campaigns/${campaignId}/returns?${params.toString()}`, apiKey, options);
+  const data = await request(`/campaigns/${singleId}/returns?${params.toString()}`, apiKey, options);
   const result = data.result || data;
   return { returns: result.returns || [] };
 }
 
 async function fetchPayoutsByDate(dateFrom, dateTo, campaignId, apiKey, options = {}) {
-  if (!campaignId) {
+  const ids = normalizeIds([campaignId]);
+  if (!ids.length) {
     throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
   }
-  const data = await request(`/campaigns/${campaignId}/payouts?fromDate=${dateFrom}&toDate=${dateTo}`, apiKey, options);
+  if (ids.length > 1) {
+    const all = [];
+    for (const id of ids) {
+      const part = await fetchPayoutsByDate(dateFrom, dateTo, id, apiKey, options);
+      all.push(...(part.payouts || []));
+    }
+    return { payouts: all };
+  }
+  const singleId = ids[0];
+  const data = await request(`/campaigns/${singleId}/payouts?fromDate=${dateFrom}&toDate=${dateTo}`, apiKey, options);
   const result = data.result || data;
   return { payouts: result.payouts || [] };
 }

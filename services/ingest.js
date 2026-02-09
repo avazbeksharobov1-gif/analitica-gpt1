@@ -262,9 +262,20 @@ async function syncDay(projectId, date) {
   const errors = {};
 
   const config = await getSellerConfig(projectId);
-  const campaignIds = config?.campaignIds?.length ? config.campaignIds : getCampaignIds();
+  // Kampaniya ID larini har doim alohida-alohida ishlatamiz (vergul/bo'shliqli satrlarni ham bo'lib tashlaymiz)
+  const normalizeIds = (arr = []) =>
+    arr
+      .flatMap((v) => String(v || '')
+        .split(/[,\s;]+/))
+      .map((v) => v.trim())
+      .filter(Boolean);
+
+  const campaignIds = normalizeIds(config?.campaignIds?.length ? config.campaignIds : getCampaignIds());
   const apiKeys = config?.apiKeys?.length ? config.apiKeys : getApiKeys();
-  const tokenMap = config?.tokenMap?.length ? config.tokenMap : [];
+  const tokenMap = (config?.tokenMap?.length ? config.tokenMap : []).map((t) => ({
+    ...t,
+    campaignIds: normalizeIds(t.campaignIds)
+  }));
   const requestOptions = {
     baseUrl: config?.baseUrl,
     authMode: config?.authMode
@@ -307,15 +318,19 @@ async function syncDay(projectId, date) {
   const businessApiKey =
     BUSINESS_API_KEY || apiKeys[0] || (tokenMap.length ? tokenMap[0].key : null);
   if (USE_BUSINESS_ORDERS_API && BUSINESS_ID && businessApiKey) {
-    try {
-      const data = await fetchBusinessOrders(dateStr, dateStr, BUSINESS_ID, businessApiKey, {
-        ...requestOptions,
-        campaignIds
-      });
-      businessOrders.push(...(data.orders || []));
-    } catch (e) {
-      errors.businessOrders = e.message || String(e);
-      console.error('Yandex business orders error:', e.message);
+    const bizCampaigns = campaignIds.length ? campaignIds : [null];
+    for (const camp of bizCampaigns) {
+      try {
+        const data = await fetchBusinessOrders(dateStr, dateStr, BUSINESS_ID, businessApiKey, {
+          ...requestOptions,
+          campaignIds: camp ? [camp] : undefined
+        });
+        businessOrders.push(...(data.orders || []));
+      } catch (e) {
+        const key = camp ? `${camp}:businessOrders` : 'businessOrders';
+        errors[key] = e.message || String(e);
+        console.error('Yandex business orders error:', e.message);
+      }
     }
   }
 
