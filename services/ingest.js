@@ -23,6 +23,8 @@ const RETURNS_DEBUG = process.env.RETURNS_DEBUG === 'true';
 const USE_ORDERS_API = process.env.USE_ORDERS_API === 'true';
 const USE_BUSINESS_ORDERS_API = process.env.USE_BUSINESS_ORDERS_API === 'true';
 const BUSINESS_ID = process.env.YANDEX_BUSINESS_ID || process.env.YANDEX_SELLER_BUSINESS_ID;
+const BUSINESS_API_KEY =
+  process.env.YANDEX_BUSINESS_API_KEY || process.env.YANDEX_SELLER_BUSINESS_API_KEY;
 
 function toDateOnly(d) {
   const dt = new Date(d);
@@ -302,8 +304,23 @@ async function syncDay(projectId, date) {
     }
   }
 
+  const businessApiKey =
+    BUSINESS_API_KEY || apiKeys[0] || (tokenMap.length ? tokenMap[0].key : null);
+  if (USE_BUSINESS_ORDERS_API && BUSINESS_ID && businessApiKey) {
+    try {
+      const data = await fetchBusinessOrders(dateStr, dateStr, BUSINESS_ID, businessApiKey, {
+        ...requestOptions,
+        campaignIds
+      });
+      businessOrders.push(...(data.orders || []));
+    } catch (e) {
+      errors.businessOrders = e.message || String(e);
+      console.error('Yandex business orders error:', e.message);
+    }
+  }
+
   for (const { apiKey, campaignId } of pairs) {
-    const [ordersData, returnsData, payoutsData, ordersListData, businessOrdersData] = await Promise.all([
+    const [ordersData, returnsData, payoutsData, ordersListData] = await Promise.all([
       fetchOrdersByDate(dateStr, dateStr, campaignId, apiKey, requestOptions).catch((e) => {
         errors[`${campaignId}:orders`] = e.message || String(e);
         console.error('Yandex orders error:', e.message);
@@ -336,22 +353,11 @@ async function syncDay(projectId, date) {
             console.error('Yandex orders list error:', e.message);
             return { orders: [] };
           })
-        : Promise.resolve({ orders: [] }),
-      USE_BUSINESS_ORDERS_API && BUSINESS_ID
-        ? fetchBusinessOrders(dateStr, dateStr, BUSINESS_ID, apiKey, {
-            ...requestOptions,
-            campaignIds
-          }).catch((e) => {
-            errors[`${campaignId}:businessOrders`] = e.message || String(e);
-            console.error('Yandex business orders error:', e.message);
-            return { orders: [] };
-          })
         : Promise.resolve({ orders: [] })
     ]);
 
     orders.push(...(ordersData.orders || []));
     ordersList.push(...(ordersListData.orders || []));
-    businessOrders.push(...(businessOrdersData.orders || []));
     const returnsList = returnsData.returns || [];
     for (const r of returnsList) {
       returns.push({ ...r, _campaignId: campaignId, _apiKey: apiKey });
