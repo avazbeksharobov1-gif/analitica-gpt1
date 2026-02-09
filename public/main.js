@@ -358,7 +358,27 @@ async function loadProducts(range) {
 
 async function loadAI() {
   const set = (id, text) => (document.getElementById(id).innerText = text);
-  document.getElementById('aiStatus').innerText = 'Yuklanmoqda...';
+  const aiBtn = document.getElementById('aiBtn');
+  const aiStatus = document.getElementById('aiStatus');
+
+  if (aiStatus) aiStatus.innerText = 'Yuklanmoqda...';
+  if (aiBtn) {
+    aiBtn.disabled = false;
+    aiBtn.innerText = 'AI yangilash';
+  }
+
+  const setDisabled = (note) => {
+    const msg = note || "AI vaqtincha o'chirilgan (budjet yo'q)";
+    set('aiInsight', msg);
+    set('aiRecommend', msg);
+    set('aiAnomaly', msg);
+    set('aiProduct', msg);
+    if (aiStatus) aiStatus.innerText = "AI o'chirilgan";
+    if (aiBtn) {
+      aiBtn.disabled = true;
+      aiBtn.innerText = "AI o'chirilgan";
+    }
+  };
 
   try {
     const [insight, recommend, anomaly, product] = await Promise.all([
@@ -368,17 +388,23 @@ async function loadAI() {
       fetch('/api/products/insight').then(r => r.text())
     ]);
 
+    const texts = [insight, recommend, anomaly, product].map(t => String(t || '').trim());
+    if (texts.some(t => t.toLowerCase().includes('ai disabled'))) {
+      setDisabled();
+      return;
+    }
+
     set('aiInsight', insight || "Ma'lumot yo'q");
     set('aiRecommend', recommend || "Ma'lumot yo'q");
     set('aiAnomaly', anomaly || "Ma'lumot yo'q");
     set('aiProduct', product || "Ma'lumot yo'q");
-    document.getElementById('aiStatus').innerText = 'Tayyor';
+    if (aiStatus) aiStatus.innerText = 'Tayyor';
   } catch (e) {
     set('aiInsight', 'AI mavjud emas');
     set('aiRecommend', 'AI mavjud emas');
     set('aiAnomaly', 'AI mavjud emas');
     set('aiProduct', 'AI mavjud emas');
-    document.getElementById('aiStatus').innerText = 'Xato';
+    if (aiStatus) aiStatus.innerText = 'Xato';
   }
 }
 
