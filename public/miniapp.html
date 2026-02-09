@@ -14,10 +14,6 @@
 <div id="aiInsight" class="card">
   Юкланяпти...
 </div>
-<h3>🧠 AI Insight</h3>
-<div id="aiInsight" class="card">
-  Юкланяпти...
-</div>
 
 <h2>📊 Project танланг</h2>
 
@@ -37,9 +33,12 @@ function selectProject(id) {
       tgId: tg.initDataUnsafe.user.id,
       project: id
     })
-  }).then(()=>{
+  }).then(() => {
     tg.showAlert('✅ Project сақланди');
-  })
+  }).catch(() => {
+    tg.showAlert('❌ Сақлашда хато юз берди');
+  });
+}
 </script>
 </body>
 </html>

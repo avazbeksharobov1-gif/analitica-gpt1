@@ -24,6 +24,8 @@ async function writeExcel(res, { kpi, items, range, projectName }) {
   summary.addRow({ metric: 'Logistics', value: Math.round(kpi.logistics || 0) });
   summary.addRow({ metric: 'Returns', value: Math.round(kpi.returns || 0) });
   summary.addRow({ metric: 'Expenses', value: Math.round(kpi.expenses || 0) });
+  summary.addRow({ metric: 'Tax 1%', value: Math.round(kpi.tax1 || 0) });
+  summary.addRow({ metric: 'Social tax', value: Math.round(kpi.socialTax || 0) });
   summary.addRow({ metric: 'COGS', value: Math.round(kpi.cogs || 0) });
   summary.addRow({ metric: 'Profit', value: Math.round(kpi.profit || 0) });
 
