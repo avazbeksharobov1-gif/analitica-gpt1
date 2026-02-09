@@ -1,12 +1,15 @@
-{
+﻿{
   "name": "analitica-gpt",
   "version": "1.0.0",
   "private": true,
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy"
+    "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate deploy --schema=prisma/schema.prisma"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
