@@ -1,4 +1,4 @@
-﻿-- Add order status counters
+-- Add order status counters
 ALTER TABLE "SellerDaily" ADD COLUMN IF NOT EXISTS "ordersCreated" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "SellerDaily" ADD COLUMN IF NOT EXISTS "ordersWarehouse" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "SellerDaily" ADD COLUMN IF NOT EXISTS "ordersDelivered" INTEGER NOT NULL DEFAULT 0;
