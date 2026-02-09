@@ -8,6 +8,7 @@ const {
 } = require('../services/analytics');
 const { authRequired, authOptional, hashPassword, verifyPassword, signToken } = require('../services/auth');
 const { aiInsight, aiRecommend, aiAnomalyDetect, aiProductProfit } = require('../services/ai');
+const { buildMarketReport } = require('../services/insightLocal');
 const { syncDay } = require('../services/ingest');
 const { prisma } = require('../services/db');
 const { writeExcel } = require('../exporter');
@@ -332,7 +333,14 @@ module.exports = (app) => {
 
   app.get('/api/insight', guard, async (req, res) => {
     try {
-      if (AI_DISABLED) return res.send('AI disabled');
+      if (AI_DISABLED) {
+        const projectId = await resolveProjectId(req);
+        const to = new Date();
+        const from = new Date();
+        from.setDate(from.getDate() - 6);
+        const stats = await getKpi(projectId, from, to);
+        return res.send(buildMarketReport(stats));
+      }
       const projectId = await resolveProjectId(req);
       const { thisWeek, lastWeek } = await getCompareStats(projectId);
       const text = await aiInsight(lastWeek.revenue, thisWeek.revenue);

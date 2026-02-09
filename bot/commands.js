@@ -7,6 +7,7 @@
   getDailySeries
 } = require('../services/analytics');
 const { aiInsight, aiRecommend } = require('../services/ai');
+const { buildMarketReport } = require('../services/insightLocal');
 const { syncDay } = require('../services/ingest');
 const { prisma } = require('../services/db');
 const { generatePDFBuffer } = require('../services/report');
@@ -324,8 +325,13 @@ function setupCommands(bot) {
   });
 
   bot.command('insight', async (ctx) => {
-    if (AI_DISABLED) return ctx.reply("AI vaqtincha o'chirilgan");
     const projectId = getProjectId(ctx);
+    if (AI_DISABLED) {
+      const today = new Date();
+      const stats = await getKpi(projectId, today, today);
+      const text = buildMarketReport(stats);
+      return ctx.reply(text);
+    }
     const { thisWeek, lastWeek } = await getCompareStats(projectId);
     const text = await aiInsight(lastWeek.revenue, thisWeek.revenue);
     ctx.reply(`AI tahlil\n\n${text}`);
