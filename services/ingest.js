@@ -1,6 +1,8 @@
 const { prisma } = require('./db');
 const {
   fetchOrdersByDate,
+  fetchOrdersList,
+  fetchBusinessOrders,
   fetchReturnsByDate,
   fetchPayoutsByDate,
   getCampaignIds,
@@ -18,6 +20,9 @@ function parseEnvNumber(value, fallback) {
 const ACQUIRING_RATE = parseEnvNumber(process.env.ACQUIRING_RATE, 0.01);
 const SKIP_PAYOUTS = process.env.SKIP_PAYOUTS === 'true';
 const RETURNS_DEBUG = process.env.RETURNS_DEBUG === 'true';
+const USE_ORDERS_API = process.env.USE_ORDERS_API === 'true';
+const USE_BUSINESS_ORDERS_API = process.env.USE_BUSINESS_ORDERS_API === 'true';
+const BUSINESS_ID = process.env.YANDEX_BUSINESS_ID || process.env.YANDEX_SELLER_BUSINESS_ID;
 
 function toDateOnly(d) {
   const dt = new Date(d);
@@ -271,6 +276,8 @@ async function syncDay(projectId, date) {
   }
 
   const orders = [];
+  const ordersList = [];
+  const businessOrders = [];
   const returns = [];
   const payouts = [];
 
@@ -296,7 +303,7 @@ async function syncDay(projectId, date) {
   }
 
   for (const { apiKey, campaignId } of pairs) {
-    const [ordersData, returnsData, payoutsData] = await Promise.all([
+    const [ordersData, returnsData, payoutsData, ordersListData, businessOrdersData] = await Promise.all([
       fetchOrdersByDate(dateStr, dateStr, campaignId, apiKey, requestOptions).catch((e) => {
         errors[`${campaignId}:orders`] = e.message || String(e);
         console.error('Yandex orders error:', e.message);
@@ -322,10 +329,29 @@ async function syncDay(projectId, date) {
               console.warn('Yandex payouts not available, skipping');
             }
             return { payouts: [] };
+          }),
+      USE_ORDERS_API
+        ? fetchOrdersList(dateStr, dateStr, campaignId, apiKey, requestOptions).catch((e) => {
+            errors[`${campaignId}:ordersList`] = e.message || String(e);
+            console.error('Yandex orders list error:', e.message);
+            return { orders: [] };
           })
+        : Promise.resolve({ orders: [] }),
+      USE_BUSINESS_ORDERS_API && BUSINESS_ID
+        ? fetchBusinessOrders(dateStr, dateStr, BUSINESS_ID, apiKey, {
+            ...requestOptions,
+            campaignIds
+          }).catch((e) => {
+            errors[`${campaignId}:businessOrders`] = e.message || String(e);
+            console.error('Yandex business orders error:', e.message);
+            return { orders: [] };
+          })
+        : Promise.resolve({ orders: [] })
     ]);
 
     orders.push(...(ordersData.orders || []));
+    ordersList.push(...(ordersListData.orders || []));
+    businessOrders.push(...(businessOrdersData.orders || []));
     const returnsList = returnsData.returns || [];
     for (const r of returnsList) {
       returns.push({ ...r, _campaignId: campaignId, _apiKey: apiKey });
@@ -374,14 +400,19 @@ async function syncDay(projectId, date) {
   const returnsByOrder = new Map();
   const orderRevenueMap = new Map();
 
-  for (const o of orders) {
-    ordersCount += 1;
+  const statusOrders = businessOrders.length ? businessOrders : (ordersList.length ? ordersList : orders);
+  ordersCount = statusOrders.length;
+
+  for (const o of statusOrders) {
     const cls = classifyOrderStatus(o);
     if (!cls.cancelled) {
       ordersCreated += 1;
       if (cls.bucket === 'delivered') ordersDelivered += 1;
       else if (cls.bucket === 'warehouse') ordersWarehouse += 1;
     }
+  }
+
+  for (const o of orders) {
     let orderRevenue =
       pickNumber(o, [
         'total',

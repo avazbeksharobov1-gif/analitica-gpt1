@@ -3,6 +3,7 @@ const fetch = require('node-fetch');
 const BASE_URL = process.env.YANDEX_SELLER_BASE_URL || 'https://api.partner.market.yandex.ru';
 const API_KEY = process.env.YANDEX_SELLER_API_KEY;
 const CAMPAIGN_ID = process.env.YANDEX_SELLER_CAMPAIGN_ID;
+const BUSINESS_ID = process.env.YANDEX_BUSINESS_ID || process.env.YANDEX_SELLER_BUSINESS_ID;
 const AUTH_MODE = (process.env.YANDEX_SELLER_AUTH_MODE || 'api-key').toLowerCase();
 
 function getCampaignIds() {
@@ -89,6 +90,63 @@ async function fetchOrdersByDate(dateFrom, dateTo, campaignId, apiKey, options =
   return { orders };
 }
 
+async function fetchOrdersList(dateFrom, dateTo, campaignId, apiKey, options = {}) {
+  if (!campaignId) {
+    throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
+  }
+
+  const orders = [];
+  let pageToken = null;
+  do {
+    const params = new URLSearchParams();
+    params.set('fromDate', dateFrom);
+    params.set('toDate', dateTo);
+    params.set('limit', '50');
+    if (pageToken) params.set('page_token', pageToken);
+    const data = await request(`/campaigns/${campaignId}/orders?${params.toString()}`, apiKey, options);
+    const result = data.result || data;
+    orders.push(...(result.orders || []));
+    pageToken = result.paging?.nextPageToken || result.nextPageToken || null;
+  } while (pageToken);
+
+  return { orders };
+}
+
+async function fetchBusinessOrders(dateFrom, dateTo, businessId, apiKey, options = {}) {
+  if (!businessId) {
+    throw new Error('YANDEX_BUSINESS_ID missing');
+  }
+
+  const orders = [];
+  let pageToken = null;
+  do {
+    const params = new URLSearchParams();
+    params.set('limit', '50');
+    if (pageToken) params.set('page_token', pageToken);
+
+    const body = {
+      dates: {
+        creationDateFrom: dateFrom,
+        creationDateTo: dateTo
+      }
+    };
+    if (options.campaignIds && options.campaignIds.length) {
+      body.campaignIds = options.campaignIds;
+    }
+
+    const data = await request(`/v1/businesses/${businessId}/orders?${params.toString()}`, apiKey, {
+      ...options,
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    const result = data.result || data;
+    orders.push(...(result.orders || []));
+    pageToken = result.paging?.nextPageToken || result.nextPageToken || null;
+  } while (pageToken);
+
+  return { orders };
+}
+
 async function fetchReturnsByDate(dateFrom, dateTo, campaignId, apiKey, options = {}) {
   if (!campaignId) {
     throw new Error('YANDEX_SELLER_CAMPAIGN_ID(S) missing');
@@ -137,6 +195,8 @@ module.exports = {
   getCampaignIds,
   getApiKeys,
   fetchOrdersByDate,
+  fetchOrdersList,
+  fetchBusinessOrders,
   fetchReturnsByDate,
   fetchPayoutsByDate,
   fetchReturnById,
