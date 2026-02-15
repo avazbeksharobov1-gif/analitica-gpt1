@@ -10,6 +10,11 @@ function fmt(n) {
   return Math.round(n || 0).toLocaleString();
 }
 
+function safeNum(n) {
+  const v = Number(n || 0);
+  return Number.isFinite(v) ? v : 0;
+}
+
 function rangeLabel(range) {
   if (range === '7d') return '7 kun';
   if (range === '30d') return '30 kun';
@@ -74,6 +79,13 @@ async function loadKpi(range) {
   const s = await r.json();
   const tax1 = s.tax1 || 0;
   const socialTax = s.socialTax || 0;
+  const revenue = safeNum(s.revenue);
+  const fees = safeNum(s.fees);
+  const acquiring = safeNum(s.acquiring || 0);
+  const returns = safeNum(s.returns);
+  const logistics = safeNum(s.logistics);
+  const cogs = safeNum(s.cogs);
+  const expenses = safeNum(s.expenses);
 
   document.getElementById('kpi-revenue').innerText = fmt(s.revenue);
   document.getElementById('kpi-orders').innerText = fmt(s.orders);
@@ -87,29 +99,43 @@ async function loadKpi(range) {
   if (elWh) elWh.innerText = fmt(ordersWarehouse);
   if (elDel) elDel.innerText = fmt(ordersDelivered);
   document.getElementById('kpi-expenses').innerText = fmt(
-    s.expenses +
-      s.fees +
-      (s.acquiring || 0) +
-      s.logistics +
-      s.returns +
-      s.cogs +
+    expenses +
+      fees +
+      acquiring +
+      logistics +
+      returns +
+      cogs +
       tax1 +
       socialTax
   );
   document.getElementById('kpi-profit').innerText = fmt(s.profit);
 
-  const margin = s.revenue ? (s.profit / s.revenue) * 100 : 0;
+  const margin = revenue ? (safeNum(s.profit) / revenue) * 100 : 0;
+  const netCommissionRate = revenue ? ((fees + acquiring + returns) / revenue) * 100 : 0;
+  const variableRate =
+    revenue ? (fees + acquiring + returns + cogs + tax1 + socialTax) / revenue : 0;
+  const fixedCosts = logistics + expenses;
+  const breakEvenRevenue = variableRate < 1 ? fixedCosts / (1 - variableRate) : 0;
+
   document.getElementById('kpi-margin').innerText = `Marja: ${margin.toFixed(1)}%`;
   document.getElementById('kpi-range').innerText = `Davr: ${rangeLabel(range)}`;
 
-  document.getElementById('kpi-fees').innerText = fmt(s.fees);
-  document.getElementById('kpi-acquiring').innerText = fmt(s.acquiring || 0);
-  document.getElementById('kpi-logistics').innerText = fmt(s.logistics);
-  document.getElementById('kpi-returns').innerText = fmt(s.returns);
-  document.getElementById('kpi-expenses-break').innerText = fmt(s.expenses);
+  document.getElementById('kpi-fees').innerText = fmt(fees);
+  document.getElementById('kpi-acquiring').innerText = fmt(acquiring);
+  document.getElementById('kpi-logistics').innerText = fmt(logistics);
+  document.getElementById('kpi-returns').innerText = fmt(returns);
+  document.getElementById('kpi-expenses-break').innerText = fmt(expenses);
   document.getElementById('kpi-tax1').innerText = fmt(tax1);
   document.getElementById('kpi-social-tax').innerText = fmt(socialTax);
-  document.getElementById('kpi-cogs').innerText = fmt(s.cogs);
+  document.getElementById('kpi-cogs').innerText = fmt(cogs);
+  document.getElementById('kpi-net-commission').innerText = `${netCommissionRate.toFixed(2)}%`;
+  document.getElementById('kpi-breakeven').innerText =
+    breakEvenRevenue > 0 ? fmt(breakEvenRevenue) : 'N/A';
+
+  const simRevenue = document.getElementById('simRevenue');
+  const simOrders = document.getElementById('simOrders');
+  if (simRevenue && !simRevenue.value) simRevenue.value = String(Math.round(revenue));
+  if (simOrders && !simOrders.value) simOrders.value = String(Math.round(safeNum(s.orders)));
 }
 
 async function loadCompare() {
@@ -522,6 +548,39 @@ function setupActions() {
         body: JSON.stringify({ apiKeys, campaignIds, baseUrl, authMode })
       });
       status.innerText = 'Saqlandi';
+    });
+  }
+
+  const runCommissionSimBtn = document.getElementById('runCommissionSimBtn');
+  if (runCommissionSimBtn) {
+    runCommissionSimBtn.addEventListener('click', () => {
+      const revenue = safeNum(document.getElementById('simRevenue')?.value);
+      const orders = safeNum(document.getElementById('simOrders')?.value);
+      const feeRate = safeNum(document.getElementById('simFeeRate')?.value);
+      const acquiringRate = safeNum(document.getElementById('simAcquiringRate')?.value);
+      const returnsRate = safeNum(document.getElementById('simReturnsRate')?.value);
+      const logisticsPerOrder = safeNum(document.getElementById('simLogisticsPerOrder')?.value);
+      const cogs = safeNum(document.getElementById('simCogs')?.value);
+      const other = safeNum(document.getElementById('simOtherExpenses')?.value);
+
+      const fees = revenue * (feeRate / 100);
+      const acquiring = revenue * (acquiringRate / 100);
+      const returns = revenue * (returnsRate / 100);
+      const logistics = orders * logisticsPerOrder;
+      const total = fees + acquiring + returns + logistics + cogs + other;
+      const profit = revenue - total;
+      const margin = revenue ? (profit / revenue) * 100 : 0;
+      const netRate = revenue ? ((fees + acquiring + returns) / revenue) * 100 : 0;
+      const breakEven = netRate / 100 + (revenue ? cogs / revenue : 0) < 1
+        ? (logistics + other) / (1 - (netRate / 100 + (revenue ? cogs / revenue : 0)))
+        : 0;
+
+      const result = document.getElementById('commissionSimResult');
+      if (result) {
+        result.innerText =
+          `Jami xarajat: ${fmt(total)} | Foyda: ${fmt(profit)} | Marja: ${margin.toFixed(2)}% | ` +
+          `Chistaya komissiya: ${netRate.toFixed(2)}% | Break-even: ${breakEven > 0 ? fmt(breakEven) : 'N/A'}`;
+      }
     });
   }
 }
