@@ -293,6 +293,8 @@ async function syncDay(projectId, date) {
   const businessOrders = [];
   const returns = [];
   const payouts = [];
+  let payoutsUnavailable = false;
+  let payoutsUnavailableLogged = false;
 
   const returnType = process.env.YANDEX_RETURNS_TYPE;
   const returnStatuses = process.env.YANDEX_RETURNS_STATUSES;
@@ -350,15 +352,27 @@ async function syncDay(projectId, date) {
         console.error('Yandex returns error:', e.message);
         return { returns: [] };
       }),
-      SKIP_PAYOUTS
+      SKIP_PAYOUTS || payoutsUnavailable
         ? Promise.resolve({ payouts: [] })
         : fetchPayoutsByDate(dateStr, dateStr, campaignId, apiKey, requestOptions).catch((e) => {
             const msg = e.message || String(e);
-            if (!msg.includes('404') && !msg.includes('NOT_FOUND')) {
+            const unavailable =
+              msg.includes('401') ||
+              msg.includes('403') ||
+              msg.includes('404') ||
+              msg.includes('NOT_FOUND') ||
+              msg.includes('UNAUTHORIZED') ||
+              msg.includes('FORBIDDEN');
+
+            if (!unavailable) {
               errors[`${campaignId}:payouts`] = msg;
               console.error('Yandex payouts error:', msg);
             } else {
-              console.warn('Yandex payouts not available, skipping');
+              payoutsUnavailable = true;
+              if (!payoutsUnavailableLogged) {
+                console.warn('Yandex payouts not available, skipping');
+                payoutsUnavailableLogged = true;
+              }
             }
             return { payouts: [] };
           }),

@@ -35,38 +35,60 @@ function getApiKeys() {
 }
 
 function headers(apiKey, authMode) {
-  const h = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  };
-  if (!apiKey) return h;
+  const h = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json'
+  };
+  if (!apiKey) return h;
 
-  const mode = (authMode || AUTH_MODE).toLowerCase();
-  if (mode === 'bearer' || mode === 'oauth') {
-    h.Authorization = `Bearer ${apiKey}`;
-  } else {
-    h['Api-Key'] = apiKey;
-  }
-  return h;
+  const mode = String(authMode || AUTH_MODE || 'api-key').toLowerCase();
+  if (mode === 'bearer') {
+    h.Authorization = `Bearer ${apiKey}`;
+  } else if (mode === 'oauth') {
+    h.Authorization = `OAuth ${apiKey}`;
+  } else {
+    h['Api-Key'] = apiKey;
+  }
+  return h;
+}
+
+function authModeOrder(primaryMode) {
+  const primary = String(primaryMode || AUTH_MODE || 'api-key').toLowerCase();
+  const all = [primary, 'api-key', 'bearer', 'oauth'];
+  return [...new Set(all)];
 }
 
 async function request(path, apiKey, options = {}) {
-  if (!apiKey) {
-    throw new Error('YANDEX_SELLER_API_KEY missing');
-  }
+  if (!apiKey) {
+    throw new Error('YANDEX_SELLER_API_KEY missing');
+  }
 
-  const baseUrl = options.baseUrl || BASE_URL;
-  const authMode = options.authMode || AUTH_MODE;
-  const url = `${baseUrl}${path}`;
-  const r = await fetch(url, {
-    ...options,
-    headers: { ...headers(apiKey, authMode), ...(options.headers || {}) }
-  });
-  if (!r.ok) {
-    const text = await r.text();
-    throw new Error(`Yandex Seller API error: ${r.status} ${text}`);
-  }
-  return r.json();
+  const baseUrl = options.baseUrl || BASE_URL;
+  const url = `${baseUrl}${path}`;
+  const modes = authModeOrder(options.authMode);
+  let lastStatus = 0;
+  let lastText = '';
+
+  for (const mode of modes) {
+    const r = await fetch(url, {
+      ...options,
+      headers: { ...headers(apiKey, mode), ...(options.headers || {}) }
+    });
+
+    if (r.ok) {
+      return r.json();
+    }
+
+    lastStatus = r.status;
+    lastText = await r.text();
+
+    // Retry with another auth mode only for auth errors.
+    if (r.status !== 401 && r.status !== 403) {
+      break;
+    }
+  }
+
+  throw new Error(`Yandex Seller API error: ${lastStatus} ${lastText}`);
 }
 
 async function fetchOrdersByDate(dateFrom, dateTo, campaignId, apiKey, options = {}) {
