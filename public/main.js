@@ -5,6 +5,7 @@ let currentSku = '';
 let currentRange = '7d';
 let currentProjectId = null;
 let authReady = false;
+let currentView = 'dash';
 
 function fmt(n) {
   return Math.round(n || 0).toLocaleString();
@@ -32,6 +33,24 @@ function rangeToDates(range) {
     to.setHours(23, 59, 59, 999);
   }
   return { from, to };
+}
+
+function applyViewFromPath() {
+  const viewByPath = {
+    '/dashboard': 'dash',
+    '/products': 'products',
+    '/expenses': 'expenses',
+    '/ai': 'ai'
+  };
+  currentView = viewByPath[window.location.pathname] || 'dash';
+
+  document.querySelectorAll('[data-view]').forEach((section) => {
+    section.classList.toggle('view-hidden', section.dataset.view !== currentView);
+  });
+
+  document.querySelectorAll('[data-view-link]').forEach((link) => {
+    link.classList.toggle('active', link.dataset.viewLink === currentView);
+  });
 }
 
 function updateExportLinks() {
@@ -651,6 +670,7 @@ async function loadSkuSeries(sku, range) {
 
 setupRangeButtons();
 setupActions();
+applyViewFromPath();
 loadAll();
 loadAI();
 loadExpenseCategories();

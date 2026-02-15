@@ -20,10 +20,10 @@
       </div>
 
       <nav class="nav">
-        <a class="nav-item active" href="#dash">Boshqaruv</a>
-        <a class="nav-item" href="#products">Mahsulotlar</a>
-        <a class="nav-item" href="#expenses">Xarajatlar</a>
-        <a class="nav-item" href="#ai">AI tahlil</a>
+        <a class="nav-item active" href="/dashboard" data-view-link="dash">Boshqaruv</a>
+        <a class="nav-item" href="/products" data-view-link="products">Mahsulotlar</a>
+        <a class="nav-item" href="/expenses" data-view-link="expenses">Xarajatlar</a>
+        <a class="nav-item" href="/ai" data-view-link="ai">AI tahlil</a>
       </nav>
 
       <div class="sidebar-footer">
@@ -57,7 +57,7 @@
       </header>
 
       <main class="content">
-        <section class="kpi-grid" id="dash">
+        <section class="kpi-grid" id="dash" data-view="dash">
           <div class="card">
             <div class="kpi-label">Daromad</div>
             <div class="kpi-value" id="kpi-revenue">0</div>
@@ -80,7 +80,7 @@
           </div>
         </section>
 
-        <section class="kpi-grid">
+        <section class="kpi-grid" data-view="dash">
           <div class="card">
             <div class="kpi-label">Yangi buyurtmalar</div>
             <div class="kpi-value" id="kpi-orders-new">0</div>
@@ -98,7 +98,7 @@
           </div>
         </section>
 
-        <section class="grid-2">
+        <section class="grid-2" data-view="dash">
           <div class="panel">
             <div class="panel-header">
               <h3>Kunlik daromad va foyda</h3>
@@ -132,7 +132,7 @@
           </div>
         </section>
 
-        <section class="grid-2">
+        <section class="grid-2" data-view="dash">
           <div class="panel">
             <div class="panel-header">
               <h3>Komissiya simulator</h3>
@@ -155,7 +155,7 @@
           </div>
         </section>
 
-        <section class="grid-2">
+        <section class="grid-2" data-view="dash">
           <div class="panel">
             <div class="panel-header">
               <h3>Tarif</h3>
@@ -165,7 +165,7 @@
           </div>
         </section>
 
-        <section class="grid-2" id="expenses">
+        <section class="grid-2" id="expenses" data-view="expenses">
           <div class="panel">
             <div class="panel-header">
               <h3>Xarajatlar (kategoriya)</h3>
@@ -198,7 +198,7 @@
           </div>
         </section>
 
-        <section class="ai-section" id="ai">
+        <section class="ai-section" id="ai" data-view="ai">
           <div class="panel ai">
             <div class="panel-header">
               <h3>AI tahlil</h3>
@@ -213,7 +213,7 @@
           </div>
         </section>
 
-        <section class="table-section" id="products">
+        <section class="table-section" id="products" data-view="products">
           <div class="panel">
             <div class="panel-header">
               <h3>Tovarlar (SKU)</h3>

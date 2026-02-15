@@ -114,6 +114,10 @@ body {
   gap: 18px;
 }
 
+.view-hidden {
+  display: none !important;
+}
+
 .range, .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .btn {
