@@ -2,7 +2,7 @@ let chart;
 let dailyChart;
 let skuChart;
 let currentSku = '';
-let currentRange = '7d';
+let currentRange = '1w';
 let currentProjectId = null;
 let authReady = false;
 let currentView = 'dash';
@@ -11,27 +11,31 @@ function fmt(n) {
   return Math.round(n || 0).toLocaleString();
 }
 
+function fmtExact(n, digits = 2) {
+  return Number(n || 0).toLocaleString(undefined, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
+  });
+}
+
 function safeNum(n) {
   const v = Number(n || 0);
   return Number.isFinite(v) ? v : 0;
 }
 
 function rangeLabel(range) {
-  if (range === '7d') return '7 kun';
-  if (range === '30d') return '30 kun';
-  if (range === 'today') return 'Bugun';
+  if (range === '1w') return '1 haftalik';
+  if (range === '2w') return '2 haftalik';
+  if (range === '3w') return '3 haftalik';
   return range;
 }
 
 function rangeToDates(range) {
   const to = new Date();
   const from = new Date();
-  if (range === '7d') from.setDate(from.getDate() - 6);
-  if (range === '30d') from.setDate(from.getDate() - 29);
-  if (range === 'today') {
-    from.setHours(0, 0, 0, 0);
-    to.setHours(23, 59, 59, 999);
-  }
+  if (range === '1w') from.setDate(from.getDate() - 6);
+  if (range === '2w') from.setDate(from.getDate() - 13);
+  if (range === '3w') from.setDate(from.getDate() - 20);
   return { from, to };
 }
 
@@ -139,17 +143,17 @@ async function loadKpi(range) {
   document.getElementById('kpi-margin').innerText = `Marja: ${margin.toFixed(1)}%`;
   document.getElementById('kpi-range').innerText = `Davr: ${rangeLabel(range)}`;
 
-  document.getElementById('kpi-fees').innerText = fmt(fees);
-  document.getElementById('kpi-acquiring').innerText = fmt(acquiring);
-  document.getElementById('kpi-logistics').innerText = fmt(logistics);
-  document.getElementById('kpi-returns').innerText = fmt(returns);
-  document.getElementById('kpi-expenses-break').innerText = fmt(expenses);
-  document.getElementById('kpi-tax1').innerText = fmt(tax1);
-  document.getElementById('kpi-social-tax').innerText = fmt(socialTax);
-  document.getElementById('kpi-cogs').innerText = fmt(cogs);
+  document.getElementById('kpi-fees').innerText = fmtExact(fees);
+  document.getElementById('kpi-acquiring').innerText = fmtExact(acquiring);
+  document.getElementById('kpi-logistics').innerText = fmtExact(logistics);
+  document.getElementById('kpi-returns').innerText = fmtExact(returns);
+  document.getElementById('kpi-expenses-break').innerText = fmtExact(expenses);
+  document.getElementById('kpi-tax1').innerText = fmtExact(tax1);
+  document.getElementById('kpi-social-tax').innerText = fmtExact(socialTax);
+  document.getElementById('kpi-cogs').innerText = fmtExact(cogs);
   document.getElementById('kpi-net-commission').innerText = `${netCommissionRate.toFixed(2)}%`;
   document.getElementById('kpi-breakeven').innerText =
-    breakEvenRevenue > 0 ? fmt(breakEvenRevenue) : 'N/A';
+    breakEvenRevenue > 0 ? fmtExact(breakEvenRevenue) : 'N/A';
 
   const simRevenue = document.getElementById('simRevenue');
   const simOrders = document.getElementById('simOrders');
@@ -520,7 +524,7 @@ function setupActions() {
     syncRangeBtn.addEventListener('click', async () => {
       syncRangeBtn.disabled = true;
       syncRangeBtn.innerText = 'Sinxronlash...';
-      const { from, to } = rangeToDates('30d');
+      const { from, to } = rangeToDates(currentRange);
       await fetch('/api/sync/range', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -528,7 +532,7 @@ function setupActions() {
       });
       await loadAll();
       syncRangeBtn.disabled = false;
-      syncRangeBtn.innerText = '30 kunlik sinxronlash';
+      syncRangeBtn.innerText = 'Tanlangan davrni sinxronlash';
     });
   }
 
