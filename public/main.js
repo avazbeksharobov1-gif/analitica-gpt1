@@ -27,6 +27,7 @@ function rangeLabel(range) {
   if (range === '1w') return '1 haftalik';
   if (range === '2w') return '2 haftalik';
   if (range === '3w') return '3 haftalik';
+  if (range === '30d') return '30 kunlik';
   return range;
 }
 
@@ -36,6 +37,7 @@ function rangeToDates(range) {
   if (range === '1w') from.setDate(from.getDate() - 6);
   if (range === '2w') from.setDate(from.getDate() - 13);
   if (range === '3w') from.setDate(from.getDate() - 20);
+  if (range === '30d') from.setDate(from.getDate() - 29);
   return { from, to };
 }
 
