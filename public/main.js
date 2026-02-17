@@ -11,16 +11,25 @@ function fmt(n) {
   return Math.round(n || 0).toLocaleString();
 }
 
-function fmtExact(n, digits = 2) {
+function fmtInt(n) {
+  return Math.round(Number(n || 0)).toLocaleString();
+}
+
+function fmtMoney(n) {
   return Number(n || 0).toLocaleString(undefined, {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   });
 }
 
 function safeNum(n) {
   const v = Number(n || 0);
   return Number.isFinite(v) ? v : 0;
+}
+
+function fmtDate(d) {
+  const x = new Date(d);
+  return x.toISOString().slice(0, 10);
 }
 
 function rangeLabel(range) {
@@ -112,18 +121,18 @@ async function loadKpi(range) {
   const cogs = safeNum(s.cogs);
   const expenses = safeNum(s.expenses);
 
-  document.getElementById('kpi-revenue').innerText = fmt(s.revenue);
-  document.getElementById('kpi-orders').innerText = fmt(s.orders);
+  document.getElementById('kpi-revenue').innerText = fmtMoney(s.revenue);
+  document.getElementById('kpi-orders').innerText = fmtInt(s.orders);
   const ordersNew = s.ordersCreated || s.ordersNew || 0;
   const ordersWarehouse = s.ordersWarehouse || s.ordersInWarehouse || 0;
   const ordersDelivered = s.ordersDelivered || s.ordersDone || 0;
   const elNew = document.getElementById('kpi-orders-new');
   const elWh = document.getElementById('kpi-orders-warehouse');
   const elDel = document.getElementById('kpi-orders-delivered');
-  if (elNew) elNew.innerText = fmt(ordersNew);
-  if (elWh) elWh.innerText = fmt(ordersWarehouse);
-  if (elDel) elDel.innerText = fmt(ordersDelivered);
-  document.getElementById('kpi-expenses').innerText = fmt(
+  if (elNew) elNew.innerText = fmtInt(ordersNew);
+  if (elWh) elWh.innerText = fmtInt(ordersWarehouse);
+  if (elDel) elDel.innerText = fmtInt(ordersDelivered);
+  document.getElementById('kpi-expenses').innerText = fmtMoney(
     expenses +
       fees +
       acquiring +
@@ -133,7 +142,7 @@ async function loadKpi(range) {
       tax1 +
       socialTax
   );
-  document.getElementById('kpi-profit').innerText = fmt(s.profit);
+  document.getElementById('kpi-profit').innerText = fmtMoney(s.profit);
 
   const margin = revenue ? (safeNum(s.profit) / revenue) * 100 : 0;
   const netCommissionRate = revenue ? ((fees + acquiring + returns) / revenue) * 100 : 0;
@@ -143,19 +152,20 @@ async function loadKpi(range) {
   const breakEvenRevenue = variableRate < 1 ? fixedCosts / (1 - variableRate) : 0;
 
   document.getElementById('kpi-margin').innerText = `Marja: ${margin.toFixed(1)}%`;
-  document.getElementById('kpi-range').innerText = `Davr: ${rangeLabel(range)}`;
+  document.getElementById('kpi-range').innerText =
+    `Davr: ${rangeLabel(range)} (${fmtDate(from)} -> ${fmtDate(to)})`;
 
-  document.getElementById('kpi-fees').innerText = fmtExact(fees);
-  document.getElementById('kpi-acquiring').innerText = fmtExact(acquiring);
-  document.getElementById('kpi-logistics').innerText = fmtExact(logistics);
-  document.getElementById('kpi-returns').innerText = fmtExact(returns);
-  document.getElementById('kpi-expenses-break').innerText = fmtExact(expenses);
-  document.getElementById('kpi-tax1').innerText = fmtExact(tax1);
-  document.getElementById('kpi-social-tax').innerText = fmtExact(socialTax);
-  document.getElementById('kpi-cogs').innerText = fmtExact(cogs);
+  document.getElementById('kpi-fees').innerText = fmtMoney(fees);
+  document.getElementById('kpi-acquiring').innerText = fmtMoney(acquiring);
+  document.getElementById('kpi-logistics').innerText = fmtMoney(logistics);
+  document.getElementById('kpi-returns').innerText = fmtMoney(returns);
+  document.getElementById('kpi-expenses-break').innerText = fmtMoney(expenses);
+  document.getElementById('kpi-tax1').innerText = fmtMoney(tax1);
+  document.getElementById('kpi-social-tax').innerText = fmtMoney(socialTax);
+  document.getElementById('kpi-cogs').innerText = fmtMoney(cogs);
   document.getElementById('kpi-net-commission').innerText = `${netCommissionRate.toFixed(2)}%`;
   document.getElementById('kpi-breakeven').innerText =
-    breakEvenRevenue > 0 ? fmtExact(breakEvenRevenue) : 'N/A';
+    breakEvenRevenue > 0 ? fmtMoney(breakEvenRevenue) : 'N/A';
 
   const simRevenue = document.getElementById('simRevenue');
   const simOrders = document.getElementById('simOrders');
@@ -175,8 +185,8 @@ async function loadCompare() {
   const sign = diff >= 0 ? '+' : '';
   const signP = diffProfit >= 0 ? '+' : '';
   document.getElementById('compareText').innerText =
-    `Daromad (shu hafta): ${fmt(curr)}\nDaromad (otgan hafta): ${fmt(prev)}\nOzgarish: ${sign}${diff.toFixed(1)}%\n\n` +
-    `Foyda (shu hafta): ${fmt(currProfit)}\nFoyda (otgan hafta): ${fmt(prevProfit)}\nOzgarish: ${signP}${diffProfit.toFixed(1)}%`;
+    `Daromad (shu hafta): ${fmtMoney(curr)}\nDaromad (otgan hafta): ${fmtMoney(prev)}\nOzgarish: ${sign}${diff.toFixed(1)}%\n\n` +
+    `Foyda (shu hafta): ${fmtMoney(currProfit)}\nFoyda (otgan hafta): ${fmtMoney(prevProfit)}\nOzgarish: ${signP}${diffProfit.toFixed(1)}%`;
 }
 
 async function loadForecast() {
@@ -247,7 +257,7 @@ async function loadExpenseSummary(range) {
     return;
   }
   wrap.innerHTML = items
-    .map((i) => `<div><span>${i.name}</span><b>${fmt(i.amount)}</b></div>`)
+    .map((i) => `<div><span>${i.name}</span><b>${fmtMoney(i.amount)}</b></div>`)
     .join('');
 }
 
@@ -382,14 +392,14 @@ async function loadProducts(range) {
                  data-sku="${p.sku}" data-name="${p.name}"
                  value="${Math.round(p.costPrice || 0)}" />
         </td>
-        <td>${fmt(p.quantity)}</td>
-        <td>${fmt(p.revenue)}</td>
-        <td>${fmt(p.fees)}</td>
-        <td>${fmt(p.acquiring || 0)}</td>
-        <td>${fmt(p.logistics)}</td>
-        <td>${fmt(p.returns)}</td>
-        <td>${fmt(p.cogs)}</td>
-        <td>${fmt(p.profit)}</td>
+        <td>${fmtInt(p.quantity)}</td>
+        <td>${fmtMoney(p.revenue)}</td>
+        <td>${fmtMoney(p.fees)}</td>
+        <td>${fmtMoney(p.acquiring || 0)}</td>
+        <td>${fmtMoney(p.logistics)}</td>
+        <td>${fmtMoney(p.returns)}</td>
+        <td>${fmtMoney(p.cogs)}</td>
+        <td>${fmtMoney(p.profit)}</td>
         <td>${margin.toFixed(1)}%</td>
       </tr>
     `;
@@ -603,8 +613,8 @@ function setupActions() {
       const result = document.getElementById('commissionSimResult');
       if (result) {
         result.innerText =
-          `Jami xarajat: ${fmt(total)} | Foyda: ${fmt(profit)} | Marja: ${margin.toFixed(2)}% | ` +
-          `Chistaya komissiya: ${netRate.toFixed(2)}% | Break-even: ${breakEven > 0 ? fmt(breakEven) : 'N/A'}`;
+          `Jami xarajat: ${fmtMoney(total)} | Foyda: ${fmtMoney(profit)} | Marja: ${margin.toFixed(2)}% | ` +
+          `Chistaya komissiya: ${netRate.toFixed(2)}% | Break-even: ${breakEven > 0 ? fmtMoney(breakEven) : 'N/A'}`;
       }
     });
   }
