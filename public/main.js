@@ -450,8 +450,25 @@ async function loadAI() {
     ]);
 
     const texts = [insight, recommend, anomaly, product].map(t => String(t || '').trim());
-    if (texts.some(t => t.toLowerCase().includes('ai disabled'))) {
-      setDisabled();
+    const disabledResponse = texts.find((t) => {
+      const x = t.toLowerCase();
+      return x.includes('ai disabled') || x.includes("ai o'chirilgan") || x.includes('ai ochirilgan');
+    });
+    if (disabledResponse) {
+      setDisabled("AI o'chirilgan: serverda DISABLE_AI=true. .env ni tekshirib, serverni restart qiling.");
+      return;
+    }
+
+    const keyError = texts.find((t) => {
+      const x = t.toLowerCase();
+      return x.includes('gemini_api_key missing') || x.includes('openai_api_key missing');
+    });
+    if (keyError) {
+      set('aiInsight', "AI kaliti topilmadi (.env: GEMINI_API_KEY yoki OPENAI_API_KEY).");
+      set('aiRecommend', keyError);
+      set('aiAnomaly', keyError);
+      set('aiProduct', keyError);
+      if (aiStatus) aiStatus.innerText = 'Konfiguratsiya xatosi';
       return;
     }
 

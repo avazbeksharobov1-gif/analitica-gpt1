@@ -295,6 +295,8 @@ async function syncDay(projectId, date) {
   const payouts = [];
   let payoutsUnavailable = false;
   let payoutsUnavailableLogged = false;
+  let ordersRequests = 0;
+  let ordersFailures = 0;
 
   const returnType = process.env.YANDEX_RETURNS_TYPE;
   const returnStatuses = process.env.YANDEX_RETURNS_STATUSES;
@@ -337,9 +339,11 @@ async function syncDay(projectId, date) {
   }
 
   for (const { apiKey, campaignId } of pairs) {
+    ordersRequests += 1;
     const [ordersData, returnsData, payoutsData, ordersListData] = await Promise.all([
       fetchOrdersByDate(dateStr, dateStr, campaignId, apiKey, requestOptions).catch((e) => {
         errors[`${campaignId}:orders`] = e.message || String(e);
+        ordersFailures += 1;
         console.error('Yandex orders error:', e.message);
         return { orders: [] };
       }),
@@ -417,6 +421,18 @@ async function syncDay(projectId, date) {
         };
       });
       console.log(`Returns sample (${campaignId}):`, JSON.stringify(sample));
+    }
+  }
+
+  if (ordersRequests > 0 && ordersFailures === ordersRequests && orders.length === 0) {
+    const authFailed = Object.values(errors).some((msg) => {
+      const t = String(msg || '').toLowerCase();
+      return t.includes('401') || t.includes('403') || t.includes('unauthorized') || t.includes('forbidden');
+    });
+    if (authFailed) {
+      const e = new Error('YANDEX_AUTH_FAILED: token/campaign auth invalid (401/403)');
+      e.details = errors;
+      throw e;
     }
   }
 

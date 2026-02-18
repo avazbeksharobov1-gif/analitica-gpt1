@@ -706,9 +706,13 @@ module.exports = (app) => {
         results.push({ date: d.toISOString().slice(0, 10), ...r });
       }
 
-      res.json({ ok: true, total: results.length });
+      res.json({ ok: true, total: results.length, results });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      res.status(500).json({
+        ok: false,
+        error: e.message,
+        details: e.details || null
+      });
     }
   });
 

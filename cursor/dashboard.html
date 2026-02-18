@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cursor Galaxy Hand Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <canvas id="galaxyCanvas" aria-label="Galaxy effect"></canvas>
+
+  <main class="dashboard shell">
+    <section class="hud">
+      <div class="hud-top">
+        <p class="eyebrow">Cursor Interaction Lab</p>
+        <span class="dot"></span>
+      </div>
+      <h1>Galaxy Hand Controller</h1>
+      <p class="lead">Index finger bilan orb markazini boshqaring. Kamera tracking real-time ishlaydi.</p>
+      <div id="status">Initializing camera...</div>
+    </section>
+  </main>
+
+  <div class="control-dock" aria-hidden="true">
+    <div class="dock-input">tracking: hand/index-tip</div>
+    <button class="dock-btn" type="button">Live</button>
+  </div>
+
+  <!-- Hidden camera feed -->
+  <video id="handVideo" autoplay playsinline muted></video>
+
+  <!-- MediaPipe CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+  <script src="./galaxy.js"></script>
+  <script src="./main.js"></script>
+</body>
+</html>
