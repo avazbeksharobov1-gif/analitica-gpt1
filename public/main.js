@@ -443,10 +443,10 @@ async function loadAI() {
 
   try {
     const [insight, recommend, anomaly, product] = await Promise.all([
-      fetch('/api/insight').then(r => r.text()),
-      fetch('/api/recommend').then(r => r.text()),
-      fetch('/api/anomaly').then(r => r.text()),
-      fetch('/api/products/insight').then(r => r.text())
+      fetch('/api/insight?debug=1').then(r => r.text()),
+      fetch('/api/recommend?debug=1').then(r => r.text()),
+      fetch('/api/anomaly?debug=1').then(r => r.text()),
+      fetch('/api/products/insight?debug=1').then(r => r.text())
     ]);
 
     const texts = [insight, recommend, anomaly, product].map(t => String(t || '').trim());
