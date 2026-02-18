@@ -79,7 +79,20 @@ module.exports = (app) => {
   function aiFail(res, label, err, debug) {
     const msg = err && err.message ? err.message : String(err || 'Unknown error');
     console.error(`AI ${label} error:`, msg);
-    res.status(500).send(debug ? `AI ${label} error: ${msg}` : `AI ${label} not available`);
+    const m = msg.toLowerCase();
+    if (m.includes('gemini_api_key missing')) {
+      return res.status(500).send('AI sozlanmagan: GEMINI_API_KEY topilmadi');
+    }
+    if (m.includes('gemini sdk missing')) {
+      return res.status(500).send('AI kutubxonasi topilmadi: @google/generative-ai');
+    }
+    if (m.includes('429') || m.includes('quota') || m.includes('resource_exhausted')) {
+      return res.status(500).send('AI limiti tugagan (quota). Gemini billing/limitni tekshiring');
+    }
+    if (m.includes('404') || (m.includes('model') && m.includes('not found'))) {
+      return res.status(500).send('AI modeli topilmadi. GEMINI_MODEL ni yangilang');
+    }
+    return res.status(500).send(debug ? `AI ${label} error: ${msg}` : `AI ${label} vaqtincha mavjud emas`);
   }
 
   app.post('/api/auth/register', async (req, res) => {
