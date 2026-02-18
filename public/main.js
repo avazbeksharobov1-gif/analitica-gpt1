@@ -461,10 +461,10 @@ async function loadAI() {
 
     const keyError = texts.find((t) => {
       const x = t.toLowerCase();
-      return x.includes('gemini_api_key missing') || x.includes('openai_api_key missing');
+      return x.includes('gemini_api_key missing');
     });
     if (keyError) {
-      set('aiInsight', "AI kaliti topilmadi (.env: GEMINI_API_KEY yoki OPENAI_API_KEY).");
+      set('aiInsight', "AI kaliti topilmadi (.env: GEMINI_API_KEY).");
       set('aiRecommend', keyError);
       set('aiAnomaly', keyError);
       set('aiProduct', keyError);

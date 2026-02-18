@@ -1,21 +1,4 @@
-const OpenAI = require('openai');
-const fetch = require('node-fetch');
 const { generateGeminiText } = require('./gemini');
-
-const AI_PROVIDER = String(process.env.AI_PROVIDER || 'auto').toLowerCase();
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-
-const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
-
-function resolveProvider() {
-  if (AI_PROVIDER === 'gemini' || AI_PROVIDER === 'openai') return AI_PROVIDER;
-  if (GEMINI_API_KEY) return 'gemini';
-  return 'openai';
-}
 
 function withRules(taskPrompt) {
   return `
@@ -36,60 +19,12 @@ function fmtNum(v) {
   return n.toFixed(2);
 }
 
-async function generateWithOpenAI(prompt) {
-  if (!openai) throw new Error('OPENAI_API_KEY missing');
-
-  const r = await openai.chat.completions.create({
-    model: OPENAI_MODEL,
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.4
-  });
-
-  return r.choices?.[0]?.message?.content?.trim() || '';
-}
-
 async function generateWithGemini(prompt) {
-  try {
-    return await generateGeminiText(prompt);
-  } catch (sdkErr) {
-    if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY missing');
-    const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent` +
-      `?key=${encodeURIComponent(GEMINI_API_KEY)}`;
-
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 700
-        }
-      })
-    });
-
-    if (!r.ok) {
-      const text = await r.text();
-      throw new Error(`Gemini API error: ${r.status} ${text}`);
-    }
-
-    const data = await r.json();
-    const text =
-      data?.candidates?.[0]?.content?.parts
-        ?.map((p) => p?.text || '')
-        .join('')
-        .trim() || '';
-
-    if (!text) throw new Error('Gemini empty response');
-    return text;
-  }
+  return generateGeminiText(prompt);
 }
 
 async function askAI(prompt) {
-  const provider = resolveProvider();
-  if (provider === 'gemini') return generateWithGemini(prompt);
-  return generateWithOpenAI(prompt);
+  return generateWithGemini(prompt);
 }
 
 async function aiInsight(prev, curr) {
@@ -169,4 +104,24 @@ Vazifa:
   return askAI(prompt);
 }
 
-module.exports = { aiRecommend, aiInsight, aiAnomalyDetect, aiProductProfit };
+async function getInsight(prev, curr) {
+  return aiInsight(prev, curr);
+}
+
+async function getRecommendation(stats) {
+  return aiRecommend(stats);
+}
+
+async function getAnomaly(series) {
+  return aiAnomalyDetect(series);
+}
+
+module.exports = {
+  aiRecommend,
+  aiInsight,
+  aiAnomalyDetect,
+  aiProductProfit,
+  getInsight,
+  getRecommendation,
+  getAnomaly
+};
