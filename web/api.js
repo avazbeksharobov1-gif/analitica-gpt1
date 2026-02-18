@@ -95,6 +95,61 @@ module.exports = (app) => {
     return res.status(500).send(debug ? `AI ${label} error: ${msg}` : `AI ${label} vaqtincha mavjud emas`);
   }
 
+  function isAiQuotaError(err) {
+    const msg = String(err && err.message ? err.message : '').toLowerCase();
+    return msg.includes('429') || msg.includes('quota') || msg.includes('resource_exhausted');
+  }
+
+  function localRecommend(stats) {
+    const revenue = Number(stats.revenue || 0);
+    const profit = Number(stats.profit || 0);
+    const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+    const returns = Number(stats.returns || 0);
+    const logistics = Number(stats.logistics || 0);
+    const fees = Number(stats.fees || 0) + Number(stats.acquiring || 0);
+    const returnRate = revenue > 0 ? (returns / revenue) * 100 : 0;
+    const feeRate = revenue > 0 ? (fees / revenue) * 100 : 0;
+
+    return [
+      'AI limiti tugagan, lokal tavsiya ishlatildi.',
+      `Marja: ${margin.toFixed(1)}%, qaytarish: ${returnRate.toFixed(1)}%, komissiya+ekvayring: ${feeRate.toFixed(1)}%.`,
+      `1) Qaytarish ${returnRate > 12 ? 'yuqori' : 'nazoratda'}: kartochka sifati va SKU mosligini tekshiring.`,
+      `2) Logistika ${logistics > 0 ? 'mavjud' : 'kiritilmagan'}: yuklash va ombor jarayonini optimallashtiring.`,
+      '3) Narx/aksiya testini 7 kunlik A/B qilib, past marjali SKUlarni filtrlab boring.'
+    ].join('\n');
+  }
+
+  function localAnomaly(series) {
+    if (!Array.isArray(series) || !series.length) return "AI limiti tugagan, lokal tahlil: ma'lumot yetarli emas.";
+    const vals = series.map(x => Number(x.revenue || 0));
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const out = [];
+    for (const row of series) {
+      const v = Number(row.revenue || 0);
+      if (avg > 0 && (v > avg * 1.8 || v < avg * 0.5)) {
+        out.push(`${row.date}: ${Math.round(v).toLocaleString()} (o'rtacha: ${Math.round(avg).toLocaleString()})`);
+      }
+      if (out.length >= 3) break;
+    }
+    if (!out.length) return "AI limiti tugagan, lokal tahlil: aniq anomaliya topilmadi.";
+    return `AI limiti tugagan, lokal anomaliya:\n- ${out.join('\n- ')}`;
+  }
+
+  function localProductInsight(items) {
+    if (!Array.isArray(items) || !items.length) return "AI limiti tugagan, lokal tahlil: mahsulot ma'lumoti yo'q.";
+    const sorted = items
+      .map(i => ({ name: i.name || i.sku || 'SKU', profit: Number(i.profit || 0) }))
+      .sort((a, b) => b.profit - a.profit);
+    const top = sorted.slice(0, 3).map(i => `${i.name} (${Math.round(i.profit).toLocaleString()})`);
+    const low = sorted.slice(-3).reverse().map(i => `${i.name} (${Math.round(i.profit).toLocaleString()})`);
+    return [
+      'AI limiti tugagan, lokal mahsulot tahlili:',
+      `Top foydali: ${top.join(', ') || '-'}`,
+      `Past/zararli: ${low.join(', ') || '-'}`,
+      'Tavsiya: past marjali SKUlar uchun reklama stavkasini pasaytiring va narxni qayta test qiling.'
+    ].join('\n');
+  }
+
   app.post('/api/auth/register', async (req, res) => {
     try {
       const email = String(req.body.email || '').trim().toLowerCase();
@@ -359,6 +414,14 @@ module.exports = (app) => {
       const text = await aiInsight(lastWeek.revenue, thisWeek.revenue);
       res.send(text);
     } catch (e) {
+      if (isAiQuotaError(e)) {
+        const projectId = await resolveProjectId(req);
+        const to = new Date();
+        const from = new Date();
+        from.setDate(from.getDate() - 6);
+        const stats = await getKpi(projectId, from, to);
+        return res.send(buildMarketReport(stats));
+      }
       aiFail(res, 'insight', e, req.query.debug === '1');
     }
   });
@@ -371,6 +434,12 @@ module.exports = (app) => {
       const text = await aiRecommend(await getKpi(projectId, today, today));
       res.send(text);
     } catch (e) {
+      if (isAiQuotaError(e)) {
+        const projectId = await resolveProjectId(req);
+        const today = new Date();
+        const stats = await getKpi(projectId, today, today);
+        return res.send(localRecommend(stats));
+      }
       aiFail(res, 'recommendation', e, req.query.debug === '1');
     }
   });
@@ -393,6 +462,19 @@ module.exports = (app) => {
       const text = await aiAnomalyDetect(series);
       res.send(text);
     } catch (e) {
+      if (isAiQuotaError(e)) {
+        const projectId = await resolveProjectId(req);
+        const days = req.query.days ? Number(req.query.days) : 30;
+        const end = new Date();
+        const start = new Date();
+        start.setDate(start.getDate() - (days - 1));
+        const rows = await prisma.sellerDaily.findMany({
+          where: { projectId, date: { gte: start, lte: end } },
+          orderBy: { date: 'asc' }
+        });
+        const series = rows.map(r => ({ date: r.date.toISOString().slice(0, 10), revenue: r.revenue }));
+        return res.send(localAnomaly(series));
+      }
       aiFail(res, 'anomaly', e, req.query.debug === '1');
     }
   });
@@ -407,6 +489,13 @@ module.exports = (app) => {
       const text = await aiProductProfit(items);
       res.send(text);
     } catch (e) {
+      if (isAiQuotaError(e)) {
+        const projectId = await resolveProjectId(req);
+        const from = req.query.from ? new Date(req.query.from) : new Date();
+        const to = req.query.to ? new Date(req.query.to) : new Date();
+        const items = await getProductProfit(projectId, from, to);
+        return res.send(localProductInsight(items));
+      }
       aiFail(res, 'product', e, req.query.debug === '1');
     }
   });
