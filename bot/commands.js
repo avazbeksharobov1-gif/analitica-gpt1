@@ -4,7 +4,8 @@
   getForecastCompare,
   listProjects,
   addExpense,
-  getDailySeries
+  getDailySeries,
+  getProductProfit
 } = require('../services/analytics');
 const { aiInsight, aiRecommend } = require('../services/ai');
 const { buildMarketReport } = require('../services/insightLocal');
@@ -50,6 +51,146 @@ function parseExpense(text) {
   if (!categoryRaw || Number.isNaN(amount)) return null;
   const category = CATEGORY_ALIASES[categoryRaw.toLowerCase()] || categoryRaw.toLowerCase();
   return { category, amount, note: noteParts.join(' ') || null };
+}
+
+function fmtNum(v) {
+  const n = Number(v || 0);
+  return Number.isFinite(n) ? n.toLocaleString('ru-RU') : '0';
+}
+
+function statsText(title, s) {
+  return (
+    `${title}\n\n` +
+    `Daromad: ${fmtNum(s.revenue)}\n` +
+    `Buyurtmalar: ${fmtNum(s.orders)}\n` +
+    `Yangi buyurtmalar: ${fmtNum(s.ordersCreated || 0)}\n` +
+    `Omborga topshirilgan: ${fmtNum(s.ordersWarehouse || 0)}\n` +
+    `Yetkazilgan: ${fmtNum(s.ordersDelivered || 0)}\n` +
+    `Komissiya: ${fmtNum(s.fees)}\n` +
+    `Ekvayring: ${fmtNum(s.acquiring)}\n` +
+    `Logistika: ${fmtNum(s.logistics)}\n` +
+    `Qaytarish: ${fmtNum(s.returns)}\n` +
+    `Xarajat: ${fmtNum(s.expenses)}\n` +
+    `COGS: ${fmtNum(s.cogs)}\n` +
+    `Foyda: ${fmtNum(s.profit)}`
+  );
+}
+
+async function sendTodayStats(ctx) {
+  const projectId = getProjectId(ctx);
+  const today = new Date();
+  const s = await getKpi(projectId, today, today);
+  return ctx.reply(statsText('Kunlik KPI', s));
+}
+
+async function sendMonthStats(ctx) {
+  const projectId = getProjectId(ctx);
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - 29);
+  const s = await getKpi(projectId, from, to);
+  return ctx.reply(statsText('30 kunlik KPI', s));
+}
+
+async function sendExpenseSummary(ctx, days = 30) {
+  const period = Number(days);
+  const safeDays = Number.isFinite(period) && period > 0 ? Math.min(period, 365) : 30;
+  const projectId = getProjectId(ctx);
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - (safeDays - 1));
+
+  const [kpi, rows] = await Promise.all([
+    getKpi(projectId, from, to),
+    prisma.expense.groupBy({
+      by: ['categoryId'],
+      where: { projectId, date: { gte: from, lte: to } },
+      _sum: { amount: true },
+      orderBy: { _sum: { amount: 'desc' } }
+    })
+  ]);
+  const ids = rows.map((r) => r.categoryId);
+  const cats = ids.length
+    ? await prisma.expenseCategory.findMany({ where: { id: { in: ids } } })
+    : [];
+  const catMap = new Map(cats.map((c) => [c.id, c.name]));
+  const lines = rows
+    .slice(0, 10)
+    .map((r, i) => `${i + 1}. ${catMap.get(r.categoryId) || r.categoryId}: ${fmtNum(r._sum.amount || 0)}`);
+
+  const msg =
+    `Xarajatlar (${safeDays} kun)\n\n` +
+    `Jami xarajat: ${fmtNum(kpi.expenses)}\n` +
+    `Jami foyda: ${fmtNum(kpi.profit)}\n` +
+    (lines.length ? `\nTop kategoriyalar:\n${lines.join('\n')}` : `\nXarajat topilmadi`);
+  return ctx.reply(msg);
+}
+
+async function sendTopProducts(ctx, days = 30) {
+  const period = Number(days);
+  const safeDays = Number.isFinite(period) && period > 0 ? Math.min(period, 365) : 30;
+  const projectId = getProjectId(ctx);
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - (safeDays - 1));
+  const items = await getProductProfit(projectId, from, to);
+  if (!items.length) return ctx.reply(`Top SKU (${safeDays} kun): ma'lumot topilmadi`);
+
+  const top = items
+    .slice()
+    .sort((a, b) => Number(b.profit || 0) - Number(a.profit || 0))
+    .slice(0, 5)
+    .map((it, i) => `${i + 1}. ${it.name || it.sku} | Foyda: ${fmtNum(it.profit)} | Tushum: ${fmtNum(it.revenue)}`);
+  return ctx.reply(`Top SKU (${safeDays} kun)\n\n${top.join('\n')}`);
+}
+
+async function sendInsight(ctx) {
+  const projectId = getProjectId(ctx);
+  if (AI_DISABLED) {
+    const today = new Date();
+    const stats = await getKpi(projectId, today, today);
+    const text = buildMarketReport(stats);
+    return ctx.reply(text);
+  }
+  const { thisWeek, lastWeek } = await getCompareStats(projectId);
+  const text = await aiInsight(lastWeek.revenue, thisWeek.revenue);
+  return ctx.reply(`AI tahlil\n\n${text}`);
+}
+
+async function sendRecommend(ctx) {
+  if (AI_DISABLED) return ctx.reply("AI vaqtincha o'chirilgan");
+  const projectId = getProjectId(ctx);
+  const today = new Date();
+  const text = await aiRecommend(await getKpi(projectId, today, today));
+  return ctx.reply(`AI tavsiya\n\n${text}`);
+}
+
+async function sendHelp(ctx) {
+  return ctx.reply(
+    "Yordam:\n" +
+      "/stats - bugungi sotuv\n" +
+      "/month - 30 kun KPI\n" +
+      "/xarajatlar [kun] - xarajat tahlili\n" +
+      "/top [kun] - top SKU\n" +
+      "/recommend - AI maslahat\n" +
+      "/sync [YYYY-MM-DD] - Yandex sync\n" +
+      "Matn orqali ham so'rashingiz mumkin: bugungi sotuv, xarajatlar, maslahat, hisobot"
+  );
+}
+
+function detectIntent(text) {
+  const t = String(text || '').toLowerCase();
+  if (!t) return null;
+  if (/(yordam|help|nima qila olasan|komanda)/i.test(t)) return 'help';
+  if (/(sinxron|sync|yangila)/i.test(t)) return 'sync';
+  if (/(maslahat|tavsiya|recommend)/i.test(t)) return 'recommend';
+  if (/(insight|tahlil|analiz)/i.test(t)) return 'insight';
+  if (/(hisobot|report|pdf)/i.test(t)) return 'report';
+  if (/(top sku|top mahsulot|top product)/i.test(t)) return 'top';
+  if (/(xarajatlar|xarajat haqida|harajatlar|rasxod)/i.test(t)) return 'expenses';
+  if (/(oylik|30 kun|month)/i.test(t)) return 'month';
+  if (/(sotuv|savdo|daromad|kpi|bugun)/i.test(t)) return 'stats';
+  return null;
 }
 
 async function getOrCreateProject() {
@@ -187,6 +328,8 @@ function setupCommands(bot) {
         "📉 /forecast - 30 kun prognoz\n" +
         "📄 /report [kun] - PDF hisobot (standart 7)\n" +
         "💸 /xarajat - Xarajat kiritish (tugma)\n" +
+        "💰 /xarajatlar [kun] - Xarajatlar kesimi\n" +
+        "🏆 /top [kun] - Top SKU\n" +
         "🤖 /insight - AI tahlil\n" +
         "💡 /recommend - AI tavsiya\n" +
         "🔄 /sync [YYYY-MM-DD] - Yandex sinxronlash\n" +
@@ -194,11 +337,13 @@ function setupCommands(bot) {
         "🧩 /project <id> - Loyihani tanlash\n" +
         "🔔 /alerts on|off - Foyda pasaysa ogohlantirish\n" +
         "❌ /cancel - Bekor qilish\n\n" +
-        "Xarajat formati: xarajat svet 150000"
+        "Xarajat formati: xarajat svet 150000\n" +
+        "ℹ️ /help - Qo'llanma"
     );
   });
 
   bot.command('menu', (ctx) => sendMainMenu(ctx, '📋 Asosiy menyu'));
+  bot.command('help', sendHelp);
 
   bot.command('dashboard', sendDashboard);
   bot.hears(/dashboard|dash|panel/i, sendDashboard);
@@ -227,49 +372,10 @@ function setupCommands(bot) {
     ctx.reply(`Tanlandi: ${p.name}`);
   });
 
-  bot.command('stats', async (ctx) => {
-    const projectId = getProjectId(ctx);
-    const today = new Date();
-    const s = await getKpi(projectId, today, today);
-    ctx.reply(
-      `Kunlik KPI\n\n` +
-        `Daromad: ${s.revenue}\n` +
-        `Buyurtmalar: ${s.orders}\n` +
-        `Yangi buyurtmalar: ${s.ordersCreated || 0}\n` +
-        `Omborga topshirilgan: ${s.ordersWarehouse || 0}\n` +
-        `Yetkazilgan: ${s.ordersDelivered || 0}\n` +
-        `Komissiya: ${s.fees}\n` +
-        `Ekvayring: ${s.acquiring}\n` +
-        `Logistika: ${s.logistics}\n` +
-        `Qaytarish: ${s.returns}\n` +
-        `Xarajat: ${s.expenses}\n` +
-        `COGS: ${s.cogs}\n` +
-        `Foyda: ${s.profit}`
-    );
-  });
+  bot.command('stats', sendTodayStats);
+  bot.command('sales', sendTodayStats);
 
-  bot.command('month', async (ctx) => {
-    const projectId = getProjectId(ctx);
-    const to = new Date();
-    const from = new Date();
-    from.setDate(from.getDate() - 29);
-    const s = await getKpi(projectId, from, to);
-    ctx.reply(
-      `30 kunlik KPI\n\n` +
-        `Daromad: ${s.revenue}\n` +
-        `Buyurtmalar: ${s.orders}\n` +
-        `Yangi buyurtmalar: ${s.ordersCreated || 0}\n` +
-        `Omborga topshirilgan: ${s.ordersWarehouse || 0}\n` +
-        `Yetkazilgan: ${s.ordersDelivered || 0}\n` +
-        `Komissiya: ${s.fees}\n` +
-        `Ekvayring: ${s.acquiring}\n` +
-        `Logistika: ${s.logistics}\n` +
-        `Qaytarish: ${s.returns}\n` +
-        `Xarajat: ${s.expenses}\n` +
-        `COGS: ${s.cogs}\n` +
-        `Foyda: ${s.profit}`
-    );
-  });
+  bot.command('month', sendMonthStats);
 
   bot.command('compare', async (ctx) => {
     const projectId = getProjectId(ctx);
@@ -309,6 +415,18 @@ function setupCommands(bot) {
     }
   });
 
+  bot.command('xarajatlar', async (ctx) => {
+    const parts = ctx.message.text.trim().split(/\s+/);
+    const days = parts[1] ? Number(parts[1]) : 30;
+    await sendExpenseSummary(ctx, days);
+  });
+
+  bot.command('top', async (ctx) => {
+    const parts = ctx.message.text.trim().split(/\s+/);
+    const days = parts[1] ? Number(parts[1]) : 30;
+    await sendTopProducts(ctx, days);
+  });
+
   bot.command('sync', async (ctx) => {
     try {
       const projectId = getProjectId(ctx);
@@ -325,25 +443,16 @@ function setupCommands(bot) {
   });
 
   bot.command('insight', async (ctx) => {
-    const projectId = getProjectId(ctx);
-    if (AI_DISABLED) {
-      const today = new Date();
-      const stats = await getKpi(projectId, today, today);
-      const text = buildMarketReport(stats);
-      return ctx.reply(text);
+    try {
+      await sendInsight(ctx);
+    } catch (e) {
+      ctx.reply('AI tahlilda xato');
     }
-    const { thisWeek, lastWeek } = await getCompareStats(projectId);
-    const text = await aiInsight(lastWeek.revenue, thisWeek.revenue);
-    ctx.reply(`AI tahlil\n\n${text}`);
   });
 
   bot.command('recommend', async (ctx) => {
     try {
-      if (AI_DISABLED) return ctx.reply("AI vaqtincha o'chirilgan");
-      const projectId = getProjectId(ctx);
-      const today = new Date();
-      const text = await aiRecommend(await getKpi(projectId, today, today));
-      ctx.reply(`AI tavsiya\n\n${text}`);
+      await sendRecommend(ctx);
     } catch (e) {
       ctx.reply('AI mavjud emas');
     }
@@ -367,7 +476,7 @@ function setupCommands(bot) {
     ctx.reply(on ? 'Ogohlantirish yoqildi' : "Ogohlantirish o'chirildi");
   });
 
-  bot.hears(/^(expense|harajat)\s+/i, async (ctx) => {
+  bot.hears(/^(expense|harajat|xarajat)\s+/i, async (ctx) => {
     try {
       const projectId = getProjectId(ctx);
       const parsed = parseExpense(ctx.message.text);
@@ -382,10 +491,27 @@ function setupCommands(bot) {
   bot.on('text', async (ctx) => {
     const chatId = String(ctx.chat.id);
     const state = expenseFlow.get(chatId);
-    if (!state) return;
-
     const text = ctx.message.text.trim();
     if (text.startsWith('/')) return;
+
+    if (!state) {
+      const intent = detectIntent(text);
+      if (!intent) return;
+      try {
+        if (intent === 'help') return sendHelp(ctx);
+        if (intent === 'sync') return syncToday(ctx);
+        if (intent === 'recommend') return sendRecommend(ctx);
+        if (intent === 'insight') return sendInsight(ctx);
+        if (intent === 'report') return sendReport(ctx, 7);
+        if (intent === 'top') return sendTopProducts(ctx, 30);
+        if (intent === 'expenses') return sendExpenseSummary(ctx, 30);
+        if (intent === 'month') return sendMonthStats(ctx);
+        if (intent === 'stats') return sendTodayStats(ctx);
+      } catch (e) {
+        return ctx.reply("So'rovni bajarishda xato bo'ldi");
+      }
+      return;
+    }
 
     if (state.step === 'category') {
       const key = text.toLowerCase();
@@ -395,24 +521,24 @@ function setupCommands(bot) {
         }
       });
       if (!cat) {
-      return ctx.reply('Kategoriya topilmadi. Qayta tanlang.');
+        return ctx.reply('Kategoriya topilmadi. Qayta tanlang.');
+      }
+      expenseFlow.set(chatId, { step: 'amount', projectId: state.projectId, categoryCode: cat.code });
+      return ctx.reply('Summani kiriting (masalan: 150000 Izoh)', Markup.removeKeyboard());
     }
-    expenseFlow.set(chatId, { step: 'amount', projectId: state.projectId, categoryCode: cat.code });
-    return ctx.reply('Summani kiriting (masalan: 150000 Izoh)', Markup.removeKeyboard());
-  }
 
     if (state.step === 'amount') {
       const parts = text.split(/\s+/);
       const amount = Number(parts[0]);
       if (Number.isNaN(amount)) {
-      return ctx.reply('Summa xato. Faqat raqam kiriting.');
+        return ctx.reply('Summa xato. Faqat raqam kiriting.');
+      }
+      const note = parts.slice(1).join(' ') || null;
+      await addExpense(state.projectId, state.categoryCode, amount, note);
+      expenseFlow.delete(chatId);
+      return sendMainMenu(ctx, "Xarajat qo'shildi");
     }
-    const note = parts.slice(1).join(' ') || null;
-    await addExpense(state.projectId, state.categoryCode, amount, note);
-    expenseFlow.delete(chatId);
-    return sendMainMenu(ctx, "Xarajat qo'shildi");
-  }
-});
+  });
 }
 
 module.exports = setupCommands;
